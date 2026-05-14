@@ -8,7 +8,16 @@ export class WSClient {
   private handlers: Set<EventHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 10;
+  private reconnectDelay = 1000;
+  private maxReconnectDelay = 30000;
   private runId: string;
+  private lastEventTimestamp: string | null = null;
+  private intentionalDisconnect = false;
+  private _state: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
+
+  get state() { return this._state; }
 
   constructor(runId: string) {
     const base = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -18,40 +27,79 @@ export class WSClient {
 
   connect() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
+    this.intentionalDisconnect = false;
+    this._state = 'connecting';
 
-    this.ws = new WebSocket(this.url);
+    try {
+      this.ws = new WebSocket(this.url);
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
 
     this.ws.onopen = () => {
-      console.log(`[WS] Connected to run ${this.runId}`);
+      this._state = 'connected';
+      this.reconnectAttempts = 0;
+      this.reconnectDelay = 1000;
       this.startPing();
+
+      // Request replay of missed events
+      if (this.lastEventTimestamp) {
+        this.ws?.send(JSON.stringify({
+          type: 'replay',
+          since: this.lastEventTimestamp,
+        }));
+      }
     };
 
     this.ws.onmessage = (msg) => {
       try {
         const event: WSEvent = JSON.parse(msg.data);
+
         if (event.type === 'pong') return;
+
+        // Track last event timestamp for replay
+        if (event.timestamp) {
+          this.lastEventTimestamp = event.timestamp;
+        }
+
+        // Handle replay events
+        if (event.type === 'replay' && Array.isArray((event as any).events)) {
+          for (const replayEvent of (event as any).events) {
+            this.handlers.forEach((h) => h(replayEvent));
+          }
+          return;
+        }
+
         this.handlers.forEach((h) => h(event));
       } catch {
         // ignore malformed messages
       }
     };
 
-    this.ws.onclose = () => {
-      console.log(`[WS] Disconnected from run ${this.runId}`);
+    this.ws.onclose = (e) => {
+      this._state = 'disconnected';
       this.stopPing();
-      this.scheduleReconnect();
+      if (!this.intentionalDisconnect) {
+        console.log(`[WS] Closed (${e.code}): ${e.reason || 'no reason'}`);
+        this.scheduleReconnect();
+      }
     };
 
-    this.ws.onerror = (err) => {
-      console.error('[WS] Error:', err);
+    this.ws.onerror = () => {
+      // onclose will fire after this
     };
   }
 
   disconnect() {
+    this.intentionalDisconnect = true;
     this.stopPing();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.ws?.close();
-    this.ws = null;
+    if (this.ws) {
+      this.ws.close(1000, 'Client disconnect');
+      this.ws = null;
+    }
+    this._state = 'disconnected';
   }
 
   on(handler: EventHandler) {
@@ -61,7 +109,9 @@ export class WSClient {
 
   private startPing() {
     this.pingTimer = setInterval(() => {
-      this.ws?.send(JSON.stringify({ type: 'ping' }));
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
     }, 30000);
   }
 
@@ -71,6 +121,16 @@ export class WSClient {
   }
 
   private scheduleReconnect() {
-    this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('[WS] Max reconnect attempts reached');
+      return;
+    }
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectAttempts++;
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+      console.log(`[WS] Reconnecting in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts})`);
+      this.connect();
+    }, this.reconnectDelay);
   }
 }

@@ -1,94 +1,144 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '@/store';
 import { api } from '@/lib/api';
 import { WSClient } from '@/lib/ws';
-import { TopBar } from '@/components/layout/TopBar';
-import { LeftPanel } from '@/components/layout/LeftPanel';
-import { CenterPanel } from '@/components/layout/CenterPanel';
-import { RightPanel } from '@/components/layout/RightPanel';
-import { CommandCenter } from '@/components/screens/CommandCenter';
-import { LiveFactoryRun } from '@/components/screens/LiveFactoryRun';
-import { AgentMonitor } from '@/components/screens/AgentMonitor';
-import { LogsDownloads } from '@/components/screens/LogsDownloads';
-import { DeploymentPanel } from '@/components/screens/DeploymentPanel';
-import type { WSEvent } from '@/types';
-
-const SCREENS: Record<string, React.FC> = {
-  'command-center': CommandCenter,
-  'live-factory': LiveFactoryRun,
-  'agent-monitor': AgentMonitor,
-  'logs-downloads': LogsDownloads,
-  'deployment-panel': DeploymentPanel,
-};
+import type { WSEvent, Phase, Artifact } from '@/types';
 
 export default function Home() {
-  const { activeScreen, selectedRun, addLiveEvent, addLog, updateRunStatus, updatePhase, addArtifact } = useStore();
-  const [ws, setWs] = useState<WSClient | null>(null);
+  const store = useStore();
+  const wsRef = useRef<WSClient | null>(null);
 
   // Load initial data
   useEffect(() => {
     api.listProjects().then((res) => {
-      useStore.getState().setProjects(res.items);
+      store.setProjects(res.items);
     }).catch(console.error);
 
     api.listAgents().then((res) => {
-      const agents = Array.isArray(res) ? res : (res as any).items || [];
-      useStore.getState().setAgents(agents);
+      const agents = Array.isArray(res) ? res : (res as any)?.items || [];
+      store.setAgents(agents);
     }).catch(console.error);
   }, []);
 
   // WebSocket connection when run is selected
   useEffect(() => {
-    if (!selectedRun) {
-      ws?.disconnect();
-      setWs(null);
+    if (!store.selectedRun) {
+      wsRef.current?.disconnect();
+      wsRef.current = null;
       return;
     }
 
-    const client = new WSClient(selectedRun.id);
+    const runId = store.selectedRun.id;
+    const client = new WSClient(runId);
+    wsRef.current = client;
     client.connect();
-    setWs(client);
 
-    client.on((event: WSEvent) => {
-      addLiveEvent(event);
+    const unsub = client.on((event: WSEvent) => {
+      store.addLiveEvent(event);
+      const data = event.data as Record<string, unknown> | undefined;
+      if (!data) return;
 
-      switch (event.type) {
-        case 'log.entry':
-          if (event.data) addLog(event.data as any);
-          break;
-        case 'run.status_changed':
-          if (event.data?.status) updateRunStatus(selectedRun.id, event.data.status as any);
-          break;
-        case 'phase.started':
-        case 'phase.completed':
-        case 'phase.failed':
-          if (event.data) updatePhase((event.data as any).id, event.data as any);
-          break;
-        case 'artifact.created':
-          if (event.data) addArtifact(event.data as any);
-          break;
+      const eventType = event.type;
+
+      if (eventType === 'phase.transition') {
+        const phaseName = data.phase_name as string | undefined;
+        const newStatus = data.new_status as string | undefined;
+        if (phaseName && newStatus) {
+          const existing = store.phases.find(p => p.name === phaseName);
+          if (existing) {
+            store.updatePhase(existing.id, { status: newStatus as Phase['status'] });
+          } else {
+            store.setPhases([
+              ...store.phases,
+              {
+                id: `phase-${phaseName}`,
+                run_id: runId,
+                name: phaseName,
+                status: newStatus as Phase['status'],
+                order_index: store.phases.length,
+                agent_id: null,
+                model_used: null,
+                tokens_in: 0,
+                tokens_out: 0,
+                cost: 0,
+                retry_count: 0,
+                error_message: null,
+                started_at: new Date().toISOString(),
+                completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+                created_at: new Date().toISOString(),
+              } as Phase,
+            ]);
+          }
+        }
+      } else if (eventType === 'run.started' || eventType === 'run.status_changed') {
+        const status = data.status as string | undefined;
+        if (status) store.updateRunStatus(runId, status as any);
+      } else if (eventType === 'run.completed') {
+        store.updateRunStatus(runId, 'completed');
+      } else if (eventType === 'run.failed') {
+        store.updateRunStatus(runId, 'failed');
+      } else if (eventType === 'artifact.created') {
+        const artName = data.artifact_name as string | undefined;
+        if (artName) {
+          store.addArtifact({
+            id: `artifact-${Date.now()}`,
+            task_id: '',
+            run_id: runId,
+            name: artName,
+            artifact_type: (data.artifact_type as string) || 'unknown',
+            content: null,
+            file_path: null,
+            version: 1,
+            is_baseline: false,
+            is_locked: false,
+            metadata: data,
+            created_at: new Date().toISOString(),
+          } as Artifact);
+        }
+      } else if (eventType === 'cost.recorded') {
+        const cost = (data.cost as number) || 0;
+        const current = store.costReport;
+        store.setCostReport({
+          run_id: runId,
+          total_cost: (current?.total_cost || 0) + cost,
+          budget_limit: current?.budget_limit || null,
+          remaining_budget: current?.remaining_budget != null ? current.remaining_budget - cost : null,
+          warning_threshold: current?.warning_threshold || 0.8,
+          is_near_limit: false,
+          is_hard_limit_reached: false,
+          local_cost: (current?.local_cost || 0) + (data.is_local ? cost : 0),
+          paid_cost: (current?.paid_cost || 0) + (data.is_local ? 0 : cost),
+          estimated_savings: current?.estimated_savings || 0,
+          by_phase: current?.by_phase || {},
+          by_agent: current?.by_agent || {},
+          by_model: current?.by_model || {},
+        });
+      } else if (eventType === 'deployment.state_changed') {
+        store.setDeployment({
+          id: `deploy-${Date.now()}`,
+          run_id: runId,
+          project_id: store.selectedProject?.id || '',
+          status: (data.status as string) || 'unknown',
+          localhost_url: (data.url as string) || null,
+          port: null,
+          container_id: null,
+          health_status: 'unknown',
+          deployment_log: null,
+          evidence_bundle_id: null,
+          started_at: new Date().toISOString(),
+          completed_at: null,
+          created_at: new Date().toISOString(),
+        });
       }
     });
 
     return () => {
+      unsub();
       client.disconnect();
     };
-  }, [selectedRun?.id]);
+  }, [store.selectedRun?.id]);
 
-  const ScreenComponent = SCREENS[activeScreen] || CommandCenter;
-
-  return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <TopBar />
-      <div className="flex-1 flex overflow-hidden">
-        <LeftPanel />
-        <CenterPanel>
-          <ScreenComponent />
-        </CenterPanel>
-        <RightPanel />
-      </div>
-    </div>
-  );
+  return null;
 }

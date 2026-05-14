@@ -218,20 +218,40 @@ export interface SystemSetting {
 
 // WebSocket event types
 export type WSEventType =
-  | 'connected'
-  | 'phase.started'
-  | 'phase.completed'
-  | 'phase.failed'
+  | 'run.started'
+  | 'run.status_changed'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled'
+  | 'run.pause_requested'
+  | 'phase.transition'
   | 'artifact.created'
   | 'log.entry'
   | 'cost.recorded'
-  | 'deployment.status'
-  | 'run.status_changed'
-  | 'agent.action'
+  | 'deployment.state_changed'
+  | 'governance.finding'
+  | 'security.finding'
+  | 'agent.activity'
+  | 'project.created'
+  | 'intent.captured'
+  | 'context.enriched'
+  | 'spec.validated'
+  | 'approval.baseline_created'
+  | 'approval.auto_approved'
+  | 'approval.pending'
   | 'approval.required'
   | 'approval.decision'
+  | 'git.branch_created'
+  | 'test.completed'
+  | 'refactor.started'
+  | 'refactor.skipped'
   | 'evidence.updated'
-  | 'pattern.extracted'
+  | 'memory.updated'
+  | 'gates.evaluated'
+  | 'custom'
+  | 'connected'
+  | 'replay'
+  | 'subscribed'
   | 'ping'
   | 'pong';
 
@@ -239,6 +259,7 @@ export interface WSEvent {
   type: WSEventType;
   run_id?: string;
   timestamp?: string;
+  severity?: string;
   data?: Record<string, unknown>;
 }
 

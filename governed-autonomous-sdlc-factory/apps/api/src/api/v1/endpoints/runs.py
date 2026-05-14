@@ -169,3 +169,32 @@ async def cancel_run(run_id: str, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await db.refresh(run)
     return run
+
+
+@router.post("/{run_id}/start", response_model=RunResponse)
+async def start_run(run_id: str, db: AsyncSession = Depends(get_db)):
+    """Start a run — triggers the SDLC workflow."""
+    import asyncio
+    from src.services.run_orchestrator import orchestrator
+    from src.models import Project
+
+    result = await db.execute(select(Run).where(Run.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    proj_result = await db.execute(select(Project).where(Project.id == run.project_id))
+    project = proj_result.scalar_one_or_none()
+    idea_text = project.idea_text if project else ""
+
+    asyncio.create_task(
+        orchestrator.start_run(
+            project_id=run.project_id,
+            name=run.name,
+            idea_text=idea_text or "",
+            budget_limit=run.budget_limit,
+            is_demo=run.is_demo,
+        )
+    )
+
+    return run

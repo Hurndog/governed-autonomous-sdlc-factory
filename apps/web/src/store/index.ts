@@ -51,6 +51,8 @@ interface AppState {
   setActiveScreen: (s: string) => void;
   inspectorOpen: boolean;
   toggleInspector: () => void;
+  selectedPhaseId: string | null;
+  setSelectedPhaseId: (id: string | null) => void;
   commandInput: string;
   setCommandInput: (s: string) => void;
 }
@@ -112,6 +114,8 @@ export const useStore = create<AppState>((set) => ({
   setActiveScreen: (activeScreen) => set({ activeScreen }),
   inspectorOpen: true,
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
+  selectedPhaseId: null,
+  setSelectedPhaseId: (selectedPhaseId) => set({ selectedPhaseId }),
   commandInput: '',
   setCommandInput: (commandInput) => set({ commandInput }),
 }));
