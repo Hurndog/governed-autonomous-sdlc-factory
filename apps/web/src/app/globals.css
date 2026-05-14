@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-tertiary: #1a1a25;
+    --bg-elevated: #22222f;
+    --border-primary: #2a2a3a;
+    --border-secondary: #3a3a4f;
+    --text-primary: #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-muted: #6a6a80;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  * {
+    @apply border-[var(--border-primary)];
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-secondary);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg;
+  }
+  .panel-header {
+    @apply px-4 py-3 border-b border-[var(--border-primary)] font-medium text-sm text-[var(--text-secondary)];
+  }
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+  .status-pending { @apply bg-[var(--text-muted)]; }
+  .status-running { @apply bg-[var(--accent-blue)] animate-pulse; }
+  .status-completed { @apply bg-[var(--accent-green)]; }
+  .status-failed { @apply bg-[var(--accent-red)]; }
+  .status-paused { @apply bg-[var(--accent-amber)]; }
+}
