@@ -130,6 +130,126 @@ export const api = {
   getSettings: () => request<Record<string, SystemSetting>>('/settings/'),
   updateSetting: (key: string, value: string) =>
     request<{ key: string; value: string }>(`/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) }),
+
+  // =============================================================================
+  // PHASE 4: ENGINE API
+  // =============================================================================
+
+  // Specification Engine
+  generateSpecification: (run_id: string, project_id: string, project_name: string, project_description?: string) =>
+    request<{ status: string; spec_version_id: string; version: number }>(
+      `/engines/specification/generate/${run_id}?project_id=${project_id}&project_name=${encodeURIComponent(project_name)}&project_description=${encodeURIComponent(project_description || '')}`,
+      { method: 'POST' },
+    ),
+  getSpecifications: (run_id: string) =>
+    request<Array<{ id: string; version: number; status: string; generated_by: string | null; approved_by: string | null; created_at: string | null }>>(
+      `/engines/specification/${run_id}`,
+    ),
+  getLatestSpecification: (run_id: string) =>
+    request<SpecificationVersion>(`/engines/specification/${run_id}/latest`),
+  lockSpecification: (run_id: string, version_id: string) =>
+    request<{ status: string; baseline_id: string; version: number }>(
+      `/engines/specification/${run_id}/lock/${version_id}`,
+      { method: 'POST' },
+    ),
+  diffSpecifications: (run_id: string, from_version: string, to_version: string) =>
+    request<ArtifactDiff>(
+      `/engines/specification/${run_id}/diff?from_version=${from_version}&to_version=${to_version}`,
+    ),
+
+  // Architecture Engine
+  generateArchitecture: (run_id: string, project_id: string, project_name: string) =>
+    request<{ status: string; arch_version_id: string; version: number }>(
+      `/engines/architecture/generate/${run_id}?project_id=${project_id}&project_name=${encodeURIComponent(project_name)}`,
+      { method: 'POST' },
+    ),
+  getArchitectures: (run_id: string) =>
+    request<Array<{ id: string; version: number; status: string; component_count: number; adr_count: number; created_at: string | null }>>(
+      `/engines/architecture/${run_id}`,
+    ),
+  getLatestArchitecture: (run_id: string) =>
+    request<ArchitectureVersion>(`/engines/architecture/${run_id}/latest`),
+  lockArchitecture: (run_id: string, version_id: string) =>
+    request<{ status: string; baseline_id: string; version: number }>(
+      `/engines/architecture/${run_id}/lock/${version_id}`,
+      { method: 'POST' },
+    ),
+  checkArchitectureDrift: (run_id: string, current_state: Record<string, unknown>) =>
+    request<Record<string, unknown>>(
+      `/engines/architecture/${run_id}/drift-check`,
+      { method: 'POST', body: JSON.stringify(current_state) },
+    ),
+
+  // Governance Engine
+  seedGovernancePolicies: () =>
+    request<{ status: string }>('/engines/governance/seed', { method: 'POST' }),
+  getGovernancePolicies: (active_only = true) =>
+    request<GovernancePolicy[]>(`/engines/governance/policies?active_only=${active_only}`),
+  evaluateGovernance: (run_id: string, input_data: Record<string, unknown>) =>
+    request<{ evaluations: GovernanceEvaluation[]; summary: { total: number; passed: number; failed: number; warnings: number } }>(
+      `/engines/governance/evaluate/${run_id}`,
+      { method: 'POST', body: JSON.stringify(input_data) },
+    ),
+  getGovernanceEvaluations: (run_id: string) =>
+    request<GovernanceEvaluation[]>(`/engines/governance/evaluations/${run_id}`),
+  createReleaseGate: (run_id: string, gate_name: string, required_policy_ids: string[]) =>
+    request<{ gate_id: string; name: string; status: string }>(
+      `/engines/governance/release-gates/${run_id}?gate_name=${encodeURIComponent(gate_name)}&${required_policy_ids.map(id => `required_policy_ids=${id}`).join('&')}`,
+      { method: 'POST' },
+    ),
+  evaluateReleaseGate: (run_id: string, gate_id: string) =>
+    request<{ gate_id: string; name: string; status: string }>(
+      `/engines/governance/release-gates/${run_id}/evaluate/${gate_id}`,
+      { method: 'POST' },
+    ),
+  waiveReleaseGate: (run_id: string, gate_id: string, reason: string) =>
+    request<{ gate_id: string; name: string; status: string; waived_by: string }>(
+      `/engines/governance/release-gates/${run_id}/waive/${gate_id}?reason=${encodeURIComponent(reason)}`,
+      { method: 'POST' },
+    ),
+
+  // Test Plan Generator
+  generateTestPlan: (run_id: string, project_id: string, requirements: Record<string, unknown>[], nfr?: Record<string, unknown>[]) =>
+    request<{ status: string; test_plan_id: string; version: number }>(
+      `/engines/test-plan/generate/${run_id}?project_id=${project_id}`,
+      { method: 'POST', body: JSON.stringify({ requirements, nfr: nfr || [] }) },
+    ),
+  getTestPlans: (run_id: string) =>
+    request<Array<{ id: string; version: number; status: string; traceability_map: Record<string, string[]>; created_at: string | null }>>(
+      `/engines/test-plan/${run_id}`,
+    ),
+  getLatestTestPlan: (run_id: string) =>
+    request<TestPlan>(`/engines/test-plan/${run_id}/latest`),
+
+  // Traceability
+  getTraceability: (run_id: string) =>
+    request<{ links: TraceabilityLink[]; count: number }>(`/engines/traceability/${run_id}`),
+  createTraceabilityLink: (run_id: string, source_type: string, source_id: string, target_type: string, target_id: string, link_type = 'implements') =>
+    request<{ link_id: string }>(
+      `/engines/traceability/${run_id}/link?source_type=${source_type}&source_id=${source_id}&target_type=${target_type}&target_id=${target_id}&link_type=${link_type}`,
+      { method: 'POST' },
+    ),
+  getTraceabilityCoverage: (run_id: string, requirements?: Record<string, unknown>[]) =>
+    request<TraceabilityCoverage>(
+      `/engines/traceability/${run_id}/coverage`,
+      requirements ? { method: 'POST', body: JSON.stringify(requirements) } : undefined,
+    ),
+
+  // Snapshots
+  createSnapshot: (run_id: string, snapshot_type = 'manual') =>
+    request<{ snapshot_id: string; type: string }>(
+      `/engines/snapshots/${run_id}?snapshot_type=${snapshot_type}`,
+      { method: 'POST' },
+    ),
+  getSnapshots: (run_id: string) =>
+    request<Array<{ id: string; type: string; created_at: string | null }>>(`/engines/snapshots/${run_id}`),
+  exportSnapshot: (run_id: string, snapshot_id: string) =>
+    request<Record<string, unknown>>(`/engines/snapshots/${run_id}/export/${snapshot_id}`),
 };
 
-import type { Project, Run, Phase, Agent, Task, Artifact, Approval, LogEvent, CostEvent, CostReport, EvidenceBundle, Deployment, Pattern, MemoryItem, SystemSetting } from '@/types';
+import type {
+  Project, Run, Phase, Agent, Task, Artifact, Approval, LogEvent, CostEvent, CostReport,
+  EvidenceBundle, Deployment, Pattern, MemoryItem, SystemSetting,
+  SpecificationVersion, ArchitectureVersion, GovernancePolicy, GovernanceEvaluation,
+  GovernanceReleaseGate, TestPlan, TraceabilityLink, TraceabilityCoverage, RunSnapshot, ArtifactDiff,
+} from '@/types';

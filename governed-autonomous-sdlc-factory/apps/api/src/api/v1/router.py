@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from src.api.v1.endpoints import (
     projects, runs, phases, agents, tasks, artifacts, approvals,
     logs, evidence, costs, patterns, memory,
-    github as github_endpoints, deployment, settings,
+    github as github_endpoints, deployment, settings, engines,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -23,3 +23,4 @@ api_router.include_router(memory.router, prefix="/memory", tags=["memory"])
 api_router.include_router(github_endpoints.router, prefix="/github", tags=["github"])
 api_router.include_router(deployment.router, prefix="/deployment", tags=["deployment"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(engines.router, tags=["engines"])

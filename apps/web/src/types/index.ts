@@ -230,12 +230,23 @@ export type WSEventType =
   | 'cost.recorded'
   | 'deployment.state_changed'
   | 'governance.finding'
+  | 'governance.gate_evaluated'
+  | 'governance.gate_waived'
   | 'security.finding'
   | 'agent.activity'
   | 'project.created'
   | 'intent.captured'
   | 'context.enriched'
+  | 'spec.generated'
   | 'spec.validated'
+  | 'spec.baseline_locked'
+  | 'spec.validation_issue'
+  | 'architecture.generated'
+  | 'architecture.baseline_locked'
+  | 'adr.created'
+  | 'testplan.generated'
+  | 'traceability.linked'
+  | 'snapshot.created'
   | 'approval.baseline_created'
   | 'approval.auto_approved'
   | 'approval.pending'
@@ -261,6 +272,137 @@ export interface WSEvent {
   timestamp?: string;
   severity?: string;
   data?: Record<string, unknown>;
+}
+
+// =============================================================================
+// PHASE 4: ENGINE TYPES
+// =============================================================================
+
+export interface SpecificationVersion {
+  id: string;
+  run_id: string;
+  project_id: string;
+  version: number;
+  status: 'draft' | 'reviewing' | 'approved' | 'locked' | 'superseded';
+  requirements_yaml: Record<string, unknown> | null;
+  functional_spec: string | null;
+  acceptance_criteria: Record<string, unknown> | null;
+  non_functional_requirements: Record<string, unknown> | null;
+  assumptions: string | null;
+  validation_errors: Array<{ code: string; severity: string; message: string; requirement_id?: string }>;
+  generated_by: string | null;
+  approved_by: string | null;
+  created_at: string | null;
+}
+
+export interface ArchitectureVersion {
+  id: string;
+  run_id: string;
+  project_id: string;
+  version: number;
+  status: 'draft' | 'reviewing' | 'approved' | 'locked' | 'superseded';
+  architecture_yaml: Record<string, unknown> | null;
+  architecture_md: string | null;
+  mermaid_diagrams: Record<string, string> | null;
+  adrs: Array<{
+    id: string;
+    title: string;
+    context: string;
+    decision: string;
+    consequences: string[];
+    status: string;
+    alternatives: string[];
+    created_at: string;
+  }>;
+  constraints: Array<{ id: string; name: string; description: string; enforcement: string }>;
+  fitness_functions: Array<{ id: string; name: string; metric: string; threshold: string; status: string }>;
+  drift_metadata: Record<string, unknown>;
+  generated_by: string | null;
+  created_at: string | null;
+}
+
+export interface GovernancePolicy {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  severity: string;
+  is_blocking: boolean;
+  is_active: boolean;
+  version: number;
+}
+
+export interface GovernanceEvaluation {
+  id: string;
+  policy_id: string;
+  decision: 'pass' | 'fail' | 'warning' | 'error';
+  findings: string[];
+  evaluated_at: string | null;
+}
+
+export interface GovernanceReleaseGate {
+  id: string;
+  gate_name: string;
+  status: 'pending' | 'passed' | 'failed' | 'waived';
+  required_policy_ids: string[];
+  waived_by: string | null;
+  waived_reason: string | null;
+  evaluated_at: string | null;
+}
+
+export interface TestPlan {
+  id: string;
+  run_id: string;
+  project_id: string;
+  version: number;
+  status: string;
+  unit_test_strategy: Record<string, unknown> | null;
+  integration_test_strategy: Record<string, unknown> | null;
+  api_contract_tests: Array<Record<string, unknown>>;
+  edge_cases: Array<Record<string, unknown>>;
+  smoke_tests: Array<Record<string, unknown>>;
+  governance_tests: Array<Record<string, unknown>>;
+  regression_strategy: Record<string, unknown> | null;
+  traceability_map: Record<string, string[]>;
+  generated_by: string | null;
+  created_at: string | null;
+}
+
+export interface TraceabilityLink {
+  link_id: string;
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  link_type: string;
+}
+
+export interface TraceabilityCoverage {
+  total_requirements: number;
+  covered_requirements: number;
+  uncovered_requirements: string[];
+  coverage_percent: number;
+}
+
+export interface RunSnapshot {
+  id: string;
+  run_id: string;
+  type: string;
+  state: Record<string, unknown>;
+  phases: Record<string, unknown>;
+  artifacts: Record<string, unknown>;
+  costs: Record<string, unknown>;
+  governance: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface ArtifactDiff {
+  from_version: number;
+  to_version: number;
+  added: Array<Record<string, unknown>>;
+  removed: Array<Record<string, unknown>>;
+  modified: Array<{ id: string; from: Record<string, unknown>; to: Record<string, unknown> }>;
+  summary: { total_added: number; total_removed: number; total_modified: number };
 }
 
 // Slash command types

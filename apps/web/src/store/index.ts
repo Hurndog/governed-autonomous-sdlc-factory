@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { Project, Run, Phase, Agent, LogEvent, Artifact, CostReport, Deployment, WSEvent } from '@/types';
+import type {
+  Project, Run, Phase, Agent, LogEvent, Artifact, CostReport, Deployment, WSEvent,
+  SpecificationVersion, ArchitectureVersion, GovernancePolicy, GovernanceEvaluation,
+  GovernanceReleaseGate, TestPlan, TraceabilityLink, RunSnapshot,
+} from '@/types';
 
 interface AppState {
   // Projects
@@ -45,6 +49,42 @@ interface AppState {
   liveEvents: WSEvent[];
   addLiveEvent: (e: WSEvent) => void;
   clearLiveEvents: () => void;
+
+  // =============================================================================
+  // PHASE 4: ENGINE STATE
+  // =============================================================================
+
+  // Specification
+  currentSpec: SpecificationVersion | null;
+  setCurrentSpec: (s: SpecificationVersion | null) => void;
+  specVersions: SpecificationVersion[];
+  setSpecVersions: (s: SpecificationVersion[]) => void;
+
+  // Architecture
+  currentArch: ArchitectureVersion | null;
+  setCurrentArch: (a: ArchitectureVersion | null) => void;
+  archVersions: ArchitectureVersion[];
+  setArchVersions: (a: ArchitectureVersion[]) => void;
+
+  // Governance
+  governancePolicies: GovernancePolicy[];
+  setGovernancePolicies: (p: GovernancePolicy[]) => void;
+  governanceEvaluations: GovernanceEvaluation[];
+  setGovernanceEvaluations: (e: GovernanceEvaluation[]) => void;
+  releaseGates: GovernanceReleaseGate[];
+  setReleaseGates: (g: GovernanceReleaseGate[]) => void;
+
+  // Test Plan
+  currentTestPlan: TestPlan | null;
+  setCurrentTestPlan: (t: TestPlan | null) => void;
+
+  // Traceability
+  traceabilityLinks: TraceabilityLink[];
+  setTraceabilityLinks: (l: TraceabilityLink[]) => void;
+
+  // Snapshots
+  snapshots: RunSnapshot[];
+  setSnapshots: (s: RunSnapshot[]) => void;
 
   // UI state
   activeScreen: string;
@@ -108,6 +148,42 @@ export const useStore = create<AppState>((set) => ({
   liveEvents: [],
   addLiveEvent: (event) => set((s) => ({ liveEvents: [...s.liveEvents, event] })),
   clearLiveEvents: () => set({ liveEvents: [] }),
+
+  // =============================================================================
+  // PHASE 4: ENGINE STATE INITIALIZERS
+  // =============================================================================
+
+  // Specification
+  currentSpec: null,
+  setCurrentSpec: (currentSpec) => set({ currentSpec }),
+  specVersions: [],
+  setSpecVersions: (specVersions) => set({ specVersions }),
+
+  // Architecture
+  currentArch: null,
+  setCurrentArch: (currentArch) => set({ currentArch }),
+  archVersions: [],
+  setArchVersions: (archVersions) => set({ archVersions }),
+
+  // Governance
+  governancePolicies: [],
+  setGovernancePolicies: (governancePolicies) => set({ governancePolicies }),
+  governanceEvaluations: [],
+  setGovernanceEvaluations: (governanceEvaluations) => set({ governanceEvaluations }),
+  releaseGates: [],
+  setReleaseGates: (releaseGates) => set({ releaseGates }),
+
+  // Test Plan
+  currentTestPlan: null,
+  setCurrentTestPlan: (currentTestPlan) => set({ currentTestPlan }),
+
+  // Traceability
+  traceabilityLinks: [],
+  setTraceabilityLinks: (traceabilityLinks) => set({ traceabilityLinks }),
+
+  // Snapshots
+  snapshots: [],
+  setSnapshots: (snapshots) => set({ snapshots }),
 
   // UI
   activeScreen: 'command-center',
