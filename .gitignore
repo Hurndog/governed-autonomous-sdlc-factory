@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.so
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (keep structure, ignore content)
+logs/*
+!logs/.gitkeep
+
+# Evidence (keep structure)
+evidence/runs/*
+
+# Generated projects (keep structure)
+generated-projects/*
+!generated-projects/.gitkeep
+
+# Docker
+docker-compose.override.yml
