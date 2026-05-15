@@ -74,7 +74,7 @@ class RunEventBus:
         asyncio.create_task(self._persist_event(event))
 
     async def _persist_event(self, event: Event):
-        """Persist event to database."""
+        """Persist event to database with hash."""
         try:
             async with async_session_factory() as session:
                 log = LogEvent(
@@ -89,6 +89,21 @@ class RunEventBus:
                     commit_hash=event.data.get("commit_hash"),
                     metadata_=event.data,
                 )
+                # Compute event hash
+                try:
+                    from src.core.hash_propagation import hash_event
+                    # Get parent hash from last event in this run
+                    from sqlalchemy import select
+                    from src.models import LogEvent as LE
+                    result = await session.execute(
+                        select(LE.chain_hash).where(LE.run_id == event.run_id).order_by(LE.created_at.desc()).limit(1)
+                    )
+                    last_chain = result.scalars().first()
+                    parent_hash = last_chain if last_chain else None
+                    hash_event(log, event.run_id, parent_hash)
+                except Exception:
+                    pass  # Hash computation is best-effort
+
                 session.add(log)
                 await session.commit()
         except Exception as e:

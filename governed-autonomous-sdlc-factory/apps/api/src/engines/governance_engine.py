@@ -398,6 +398,10 @@ class GovernanceEngine:
                 "evaluated_by": "opa" if self.opa_available else "builtin",
             },
         )
+        # Compute integrity hash for the evaluation
+        from src.core.hash_propagation import hash_governance_eval
+        hash_governance_eval(evaluation, policy.name)
+
         session.add(evaluation)
         await session.flush()
 

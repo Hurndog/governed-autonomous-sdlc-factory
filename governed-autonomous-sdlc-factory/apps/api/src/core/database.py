@@ -30,6 +30,20 @@ async def get_db() -> AsyncSession:
             await session.close()
 
 
+async def get_db_no_autoflush() -> AsyncSession:
+    """Get a session for replay operations. Autoflush is NOT disabled — 
+    instead, the ReplayRuntime manages its own session via async_session_factory."""
+    async with async_session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

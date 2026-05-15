@@ -116,6 +116,10 @@ class SnapshotManager:
             cost_summary=cost_summary,
             governance_summary=governance_summary,
         )
+        # Compute snapshot hash
+        from src.core.hash_propagation import hash_snapshot
+        hash_snapshot(snapshot)
+
         session.add(snapshot)
         await session.commit()
 

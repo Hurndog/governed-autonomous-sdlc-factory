@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.database import get_db
+from src.core.database import get_db_no_autoflush
 from src.core.auth import get_current_auth as get_current_user
 from src.models import Run, RunStatus, Project, Artifact, LogEvent, CostEvent, RunSnapshot
 from src.services.full_pipeline_orchestrator import full_pipeline
@@ -24,7 +24,7 @@ async def run_full_pipeline(
     project_name: str = Query(default=""),
     budget_limit: Optional[float] = None,
     is_demo: bool = Query(default=True),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Execute the full cognitive pipeline: intent → spec → arch → governance → test → trace → snapshot → evidence."""
@@ -73,7 +73,7 @@ async def run_full_pipeline(
 @router.get("/runs/{run_id}/snapshot")
 async def get_run_snapshot(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Get the latest snapshot for a run."""
@@ -97,106 +97,10 @@ async def get_run_snapshot(
     }
 
 
-@router.post("/runs/{run_id}/replay")
-async def replay_run(
-    run_id: str,
-    from_timestamp: Optional[str] = Query(None, description="ISO timestamp to replay from"),
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Replay a run — returns all events in chronological order for reconstruction."""
-    # Get run
-    run = await db.get(Run, run_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Run not found")
-
-    # Get all events
-    events_query = select(LogEvent).where(LogEvent.run_id == run_id)
-    if from_timestamp:
-        events_query = events_query.where(LogEvent.created_at >= from_timestamp)
-    events_query = events_query.order_by(LogEvent.created_at)
-    events_result = await db.execute(events_query)
-    events = events_result.scalars().all()
-
-    # Get all artifacts
-    artifacts_query = select(Artifact).where(Artifact.run_id == run_id).order_by(Artifact.created_at)
-    artifacts_result = await db.execute(artifacts_query)
-    artifacts = artifacts_result.scalars().all()
-
-    # Get all costs
-    costs_query = select(CostEvent).where(CostEvent.run_id == run_id).order_by(CostEvent.created_at)
-    costs_result = await db.execute(costs_query)
-    costs = costs_result.scalars().all()
-
-    # Get snapshots
-    snaps_query = select(RunSnapshot).where(RunSnapshot.run_id == run_id).order_by(RunSnapshot.created_at)
-    snaps_result = await db.execute(snaps_query)
-    snaps = snaps_result.scalars().all()
-
-    return {
-        "run": {
-            "id": run.id,
-            "name": run.name,
-            "status": str(run.status),
-            "started_at": run.started_at.isoformat() if run.started_at else None,
-            "completed_at": run.completed_at.isoformat() if run.completed_at else None,
-            "total_cost": run.total_cost,
-        },
-        "events": [
-            {
-                "id": e.id,
-                "severity": e.severity,
-                "message": e.message,
-                "source_file": e.source_file,
-                "timestamp": e.created_at.isoformat() if e.created_at else None,
-                "metadata": e.metadata_,
-            }
-            for e in events
-        ],
-        "artifacts": [
-            {
-                "id": a.id,
-                "name": a.name,
-                "type": a.artifact_type,
-                "phase": a.phase_name,
-                "file_path": a.file_path,
-                "content_hash": a.metadata_.get("content_hash") if a.metadata_ else None,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
-            }
-            for a in artifacts
-        ],
-        "costs": [
-            {
-                "model": c.model_name,
-                "tokens_in": c.tokens_in,
-                "tokens_out": c.tokens_out,
-                "cost": c.estimated_cost,
-                "timestamp": c.created_at.isoformat() if c.created_at else None,
-            }
-            for c in costs
-        ],
-        "snapshots": [
-            {
-                "id": s.id,
-                "type": s.snapshot_type,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-            }
-            for s in snaps
-        ],
-        "replay_metadata": {
-            "total_events": len(events),
-            "total_artifacts": len(artifacts),
-            "total_cost_entries": len(costs),
-            "total_snapshots": len(snaps),
-            "replayed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        },
-    }
-
-
 @router.get("/runs/{run_id}/timeline")
 async def get_run_timeline(
     run_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Get a chronological timeline of all run events for playback."""
@@ -230,7 +134,7 @@ async def get_run_timeline(
 @router.get("/traceability/lineage/{artifact_id}")
 async def get_artifact_lineage(
     artifact_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Get the full lineage chain for an artifact."""
@@ -251,4 +155,270 @@ async def get_artifact_lineage(
             "content_hash": artifact.metadata_.get("content_hash") if artifact.metadata_ else None,
         },
         "lineage": chain,
+    }
+
+
+# ── PHASE G: Replay & Integrity API Endpoints ─────────────────────────────
+
+from src.core.integrity import IntegrityManager
+from src.engines.replay_engine import ReplayEngine
+from src.engines.divergence import DivergenceAnalyzer
+from src.models import (
+    ReplaySession, IntegrityVerification, DivergenceRecord,
+    ReplayManifest, ExecutionBaseline,
+)
+
+
+@router.get("/runs/{run_id}/integrity")
+async def get_run_integrity(
+    run_id: str,
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Get integrity verification for a run."""
+    integrity_mgr = IntegrityManager(run_id)
+    report = await integrity_mgr.verify_all(db)
+    return report.to_dict()
+
+
+@router.post("/runs/{run_id}/verify-integrity")
+async def verify_run_integrity(
+    run_id: str,
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Run full integrity verification on a run."""
+    integrity_mgr = IntegrityManager(run_id)
+    report = await integrity_mgr.verify_all(db)
+    return {
+        "run_id": run_id,
+        "integrity_score": report.overall_score,
+        "status": "pass" if report.overall_score >= 0.8 else "warning" if report.overall_score >= 0.5 else "fail",
+        "checks": report.total_checks,
+        "passed": report.passed_checks,
+        "failed": report.failed_checks,
+        "warnings": report.warning_checks,
+        "report": report.to_dict(),
+    }
+
+
+@router.post("/runs/{run_id}/replay")
+async def replay_run_full(
+    run_id: str,
+    replay_mode: str = Query(default="full", description="Replay mode: full, phase, event, snapshot, semantic"),
+    from_timestamp: Optional[str] = Query(None, description="ISO timestamp to replay from"),
+    phase_name: Optional[str] = Query(None, description="Phase name for phase-mode replay"),
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Execute a deterministic replay of a run using synchronous replay runtime.
+
+    The replay runs in a dedicated thread pool with a completely independent
+    sync SQLAlchemy session. No async/greenlet conflicts. No shared state.
+    """
+    import asyncio
+    from src.engines.replay_runtime_sync import _replay_executor, run_sync_replay
+
+    # Verify run exists first (using the async session)
+    run = await db.get(Run, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    # Execute sync replay in thread pool
+    loop = asyncio.get_running_loop()
+    try:
+        ctx = await loop.run_in_executor(
+            _replay_executor,
+            run_sync_replay,
+            run_id,
+            replay_mode,
+            from_timestamp,
+            phase_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if ctx.error:
+        raise HTTPException(status_code=500, detail=f"Replay failed: {ctx.error}")
+
+    return {
+        "replay_session_id": ctx.replay_id,
+        "run_id": ctx.run_id,
+        "replay_mode": ctx.replay_mode,
+        "status": ctx.phase,
+        "events_replayed": ctx.events_replayed,
+        "artifacts_replayed": ctx.artifacts_replayed,
+        "governance_replayed": ctx.governance_replayed,
+        "snapshots_replayed": ctx.snapshots_replayed,
+        "traceability_replayed": ctx.traceability_replayed,
+        "divergence_count": ctx.divergence_count,
+        "integrity_score": ctx.integrity_score,
+        "chain_continuity_valid": ctx.chain_continuity_valid,
+        "replay_hash": ctx.replay_hash,
+        "checkpoints": ctx.checkpoints,
+        "started_at": ctx.started_at.isoformat() if ctx.started_at else None,
+        "completed_at": ctx.completed_at.isoformat() if ctx.completed_at else None,
+    }
+
+
+@router.get("/runs/{run_id}/replay")
+async def get_replay_sessions(
+    run_id: str,
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Get all replay sessions for a run."""
+    engine = ReplayEngine(run_id)
+    sessions = await engine.get_replay_sessions(db)
+    return {
+        "run_id": run_id,
+        "replay_sessions": [
+            {
+                "id": s.id,
+                "mode": s.replay_mode,
+                "status": s.status,
+                "events_replayed": s.total_events_replayed,
+                "artifacts_replayed": s.total_artifacts_replayed,
+                "divergence_count": s.divergence_count,
+                "integrity_score": s.integrity_score,
+                "replay_hash": s.replay_hash,
+                "started_at": s.started_at.isoformat() if s.started_at else None,
+                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+            }
+            for s in sessions
+        ],
+    }
+
+
+@router.get("/runs/{run_id}/divergence")
+async def get_divergence_records(
+    run_id: str,
+    replay_session_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Get divergence records for a run."""
+    query = select(DivergenceRecord).where(DivergenceRecord.run_id == run_id)
+    if replay_session_id:
+        query = query.where(DivergenceRecord.replay_session_id == replay_session_id)
+    query = query.order_by(DivergenceRecord.detected_at.desc())
+    result = await db.execute(query)
+    records = result.scalars().all()
+
+    return {
+        "run_id": run_id,
+        "total_divergences": len(records),
+        "records": [
+            {
+                "id": r.id,
+                "type": r.divergence_type,
+                "severity": r.severity,
+                "location": r.divergence_location,
+                "expected": r.expected_value,
+                "actual": r.actual_value,
+                "causal_impact": r.causal_impact,
+                "detected_at": r.detected_at.isoformat() if r.detected_at else None,
+            }
+            for r in records
+        ],
+    }
+
+
+@router.post("/runs/{run_id}/compare")
+async def compare_run_replay(
+    run_id: str,
+    replay_session_id: str = Query(..., description="Replay session ID to compare against"),
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Compare original run with replay and generate divergence analysis."""
+    run = await db.get(Run, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    replay_session = await db.get(ReplaySession, replay_session_id)
+    if not replay_session:
+        raise HTTPException(status_code=404, detail="Replay session not found")
+
+    analyzer = DivergenceAnalyzer(run_id)
+    report = await analyzer.analyze(db, replay_session_id)
+
+    return report.to_dict()
+
+
+@router.get("/runs/{run_id}/semantic-graph")
+async def get_semantic_graph(
+    run_id: str,
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Get the semantic execution graph for a run."""
+    from src.models import SemanticGraphNode, SemanticGraphEdge
+
+    nodes_result = await db.execute(
+        select(SemanticGraphNode).where(SemanticGraphNode.run_id == run_id).order_by(SemanticGraphNode.created_at)
+    )
+    nodes = nodes_result.scalars().all()
+
+    edges_result = await db.execute(
+        select(SemanticGraphEdge).where(SemanticGraphEdge.run_id == run_id)
+    )
+    edges = edges_result.scalars().all()
+
+    return {
+        "run_id": run_id,
+        "nodes": [
+            {
+                "id": n.id,
+                "type": n.node_type,
+                "entity_id": n.entity_id,
+                "entity_name": n.entity_name,
+                "semantic_type": n.semantic_type,
+                "from_state": n.from_state,
+                "to_state": n.to_state,
+                "transition_reason": n.transition_reason,
+                "node_hash": n.node_hash,
+            }
+            for n in nodes
+        ],
+        "edges": [
+            {
+                "id": e.id,
+                "source": e.source_node_id,
+                "target": e.target_node_id,
+                "type": e.edge_type,
+                "label": e.edge_label,
+                "weight": e.edge_weight,
+                "edge_hash": e.edge_hash,
+            }
+            for e in edges
+        ],
+    }
+
+
+@router.get("/runs/{run_id}/snapshot/{snapshot_id}")
+async def get_snapshot_detail(
+    run_id: str,
+    snapshot_id: str,
+    db: AsyncSession = Depends(get_db_no_autoflush),
+    user=Depends(get_current_user),
+):
+    """Get detailed snapshot data."""
+    snapshot = await db.get(RunSnapshot, snapshot_id)
+    if not snapshot or snapshot.run_id != run_id:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    return {
+        "id": snapshot.id,
+        "run_id": snapshot.run_id,
+        "type": snapshot.snapshot_type,
+        "state": snapshot.state_data,
+        "phases": snapshot.phase_states,
+        "artifacts": snapshot.artifact_states,
+        "costs": snapshot.cost_summary,
+        "governance": snapshot.governance_summary,
+        "snapshot_hash": snapshot.snapshot_hash,
+        "chain_hash": snapshot.chain_hash,
+        "parent_hash": snapshot.parent_hash,
+        "created_at": snapshot.created_at.isoformat() if snapshot.created_at else None,
     }

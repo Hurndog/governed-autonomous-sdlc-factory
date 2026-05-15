@@ -95,6 +95,9 @@ class Run(Base):
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Phase 10: Hashing columns
+    chain_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    integrity_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     project: Mapped["Project"] = relationship(back_populates="runs")
@@ -195,6 +198,9 @@ class Artifact(Base):
     is_baseline: Mapped[bool] = mapped_column(Boolean, default=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, default={})
+    # Phase 10: Hashing columns
+    artifact_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    parent_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     task: Mapped[Optional["Task"]] = relationship(
         back_populates="artifacts",
@@ -487,6 +493,10 @@ class LogEvent(Base):
     source_file: Mapped[Optional[str]] = mapped_column(String(500))
     commit_hash: Mapped[Optional[str]] = mapped_column(String(100))
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, default={})
+    # Phase 10: Hashing columns
+    event_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    parent_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    chain_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="log_events")
     __table_args__ = (
@@ -502,6 +512,8 @@ class EvidenceBundle(Base):
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
     bundle_path: Mapped[Optional[str]] = mapped_column(String(500))
     bundle_hash: Mapped[Optional[str]] = mapped_column(String(100))
+    # Phase 10: Chain hash
+    chain_hash: Mapped[Optional[str]] = mapped_column(String(64))
     size_bytes: Mapped[Optional[int]] = mapped_column(Integer)
     artifact_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -663,6 +675,8 @@ class RunCheckpoint(Base):
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
     phase_name: Mapped[str] = mapped_column(String(100), nullable=False)
     state_data: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    # Phase 10: State hash
+    state_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="checkpoints")
 
@@ -768,9 +782,11 @@ class GovernanceEvaluation(Base):
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
     policy_id: Mapped[str] = mapped_column(String(36), ForeignKey("governance_policies.id"), nullable=False)
     artifact_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("artifacts.id"))
-    decision: Mapped[str] = mapped_column(String(20), nullable=False)  # pass, fail, warning, error
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
     findings: Mapped[Optional[list]] = mapped_column(JSONB, default=[])
     evidence: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    # Phase 10: Hashing column
+    integrity_hash: Mapped[Optional[str]] = mapped_column(String(64))
     evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="governance_evals")
     policy: Mapped["GovernancePolicy"] = relationship()
@@ -802,11 +818,13 @@ class TraceabilityLink(Base):
     __tablename__ = "traceability_links"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
-    source_type: Mapped[str] = mapped_column(String(50), nullable=False)  # requirement, design, architecture, test, governance, code, deployment
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     source_id: Mapped[str] = mapped_column(String(36), nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
     target_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    link_type: Mapped[str] = mapped_column(String(50), default="implements")  # implements, validates, depends_on, derives_from
+    link_type: Mapped[str] = mapped_column(String(50), default="implements")
+    # Phase 10: Hashing column
+    edge_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="traceability_links")
     __table_args__ = (
@@ -833,12 +851,16 @@ class RunSnapshot(Base):
     __tablename__ = "run_snapshots"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
-    snapshot_type: Mapped[str] = mapped_column(String(30), default="manual")  # manual, phase_transition, pre_deployment, post_mortem
+    snapshot_type: Mapped[str] = mapped_column(String(30), default="manual")
     state_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
     phase_states: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
     artifact_states: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
     cost_summary: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
     governance_summary: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    # Phase 10: Hashing columns
+    snapshot_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    chain_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    parent_hash: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="snapshots")
 
@@ -854,4 +876,172 @@ class ArtifactDiff(Base):
     diff_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     run: Mapped["Run"] = relationship(back_populates="artifact_diffs")
+
+
+# =============================================================================
+# PHASE 10-16: OPERATIONAL HARDENING MODELS
+# =============================================================================
+
+# ── Hashing columns on existing models (added via migration) ──────────────
+# LogEvent: event_hash, parent_hash, chain_hash
+# RunSnapshot: snapshot_hash, chain_hash, parent_hash
+# Artifact: artifact_hash, parent_hash
+# TraceabilityLink: edge_hash
+# GovernanceEvaluation: integrity_hash
+# Run: chain_hash, integrity_hash
+# EvidenceBundle: chain_hash
+# RunCheckpoint: state_hash
+
+
+# 5.5.1 replay_sessions
+class ReplaySession(Base):
+    __tablename__ = "replay_sessions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    replay_mode: Mapped[str] = mapped_column(String(30), default="full")
+    status: Mapped[str] = mapped_column(String(30), default="pending")
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    total_events_replayed: Mapped[int] = mapped_column(Integer, default=0)
+    total_artifacts_replayed: Mapped[int] = mapped_column(Integer, default=0)
+    total_governance_replayed: Mapped[int] = mapped_column(Integer, default=0)
+    divergence_count: Mapped[int] = mapped_column(Integer, default=0)
+    integrity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    replay_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    parent_replay_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("replay_sessions.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    source_run: Mapped["Run"] = relationship(foreign_keys=[source_run_id])
+
+
+# 5.5.2 replay_events
+class ReplayEvent(Base):
+    __tablename__ = "replay_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    replay_session_id: Mapped[str] = mapped_column(String(36), ForeignKey("replay_sessions.id"), nullable=False)
+    original_event_id: Mapped[Optional[str]] = mapped_column(String(36))
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), default="info")
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    source_file: Mapped[Optional[str]] = mapped_column(String(500))
+    phase_id: Mapped[Optional[str]] = mapped_column(String(36))
+    trace_id: Mapped[Optional[str]] = mapped_column(String(100))
+    event_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    parent_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    replayed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    divergence_detected: Mapped[bool] = mapped_column(Boolean, default=False)
+    divergence_details: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.3 integrity_verifications
+class IntegrityVerification(Base):
+    __tablename__ = "integrity_verifications"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    replay_session_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("replay_sessions.id"))
+    verification_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    integrity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    expected_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    actual_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    details: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.4 divergence_records
+class DivergenceRecord(Base):
+    __tablename__ = "divergence_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    replay_session_id: Mapped[str] = mapped_column(String(36), ForeignKey("replay_sessions.id"), nullable=False)
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    divergence_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    divergence_location: Mapped[Optional[str]] = mapped_column(String(200))
+    expected_value: Mapped[Optional[dict]] = mapped_column(JSONB)
+    actual_value: Mapped[Optional[dict]] = mapped_column(JSONB)
+    causal_impact: Mapped[Optional[str]] = mapped_column(Text)
+    detected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.5 semantic_graph_nodes
+class SemanticGraphNode(Base):
+    __tablename__ = "semantic_graph_nodes"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    node_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    entity_name: Mapped[Optional[str]] = mapped_column(String(500))
+    semantic_type: Mapped[Optional[str]] = mapped_column(String(100))
+    from_state: Mapped[Optional[dict]] = mapped_column(JSONB)
+    to_state: Mapped[Optional[dict]] = mapped_column(JSONB)
+    transition_reason: Mapped[Optional[str]] = mapped_column(Text)
+    node_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.6 semantic_graph_edges
+class SemanticGraphEdge(Base):
+    __tablename__ = "semantic_graph_edges"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    source_node_id: Mapped[str] = mapped_column(String(36), ForeignKey("semantic_graph_nodes.id"), nullable=False)
+    target_node_id: Mapped[str] = mapped_column(String(36), ForeignKey("semantic_graph_nodes.id"), nullable=False)
+    edge_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    edge_label: Mapped[Optional[str]] = mapped_column(String(200))
+    edge_weight: Mapped[float] = mapped_column(Float, default=1.0)
+    edge_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.7 replay_manifests
+class ReplayManifest(Base):
+    __tablename__ = "replay_manifests"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    replay_session_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("replay_sessions.id"))
+    manifest_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    manifest_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default={})
+    manifest_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    event_count: Mapped[int] = mapped_column(Integer, default=0)
+    artifact_count: Mapped[int] = mapped_column(Integer, default=0)
+    traceability_count: Mapped[int] = mapped_column(Integer, default=0)
+    governance_count: Mapped[int] = mapped_column(Integer, default=0)
+    snapshot_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# 5.5.8 execution_baselines
+class ExecutionBaseline(Base):
+    __tablename__ = "execution_baselines"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
+    baseline_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    baseline_version: Mapped[str] = mapped_column(String(20), default="1.0")
+    status: Mapped[str] = mapped_column(String(30), default="generating")
+    package_path: Mapped[Optional[str]] = mapped_column(String(500))
+    package_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    artifact_count: Mapped[int] = mapped_column(Integer, default=0)
+    event_count: Mapped[int] = mapped_column(Integer, default=0)
+    traceability_count: Mapped[int] = mapped_column(Integer, default=0)
+    governance_count: Mapped[int] = mapped_column(Integer, default=0)
+    integrity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    baseline_manifest: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# 5.5.9 replay_telemetry
+class ReplayTelemetry(Base):
+    __tablename__ = "replay_telemetry"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("runs.id"))
+    replay_session_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("replay_sessions.id"))
+    metric_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    metric_value: Mapped[float] = mapped_column(Float, nullable=False)
+    metric_unit: Mapped[Optional[str]] = mapped_column(String(50))
+    metric_labels: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

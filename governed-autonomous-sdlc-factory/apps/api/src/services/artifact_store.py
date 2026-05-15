@@ -66,8 +66,28 @@ class ArtifactStore:
         file_path = dir_path / name
         file_path.write_text(content, encoding="utf-8")
 
-        # 2. Compute hash
+        # 2. Compute hashes
         content_hash = self._compute_hash(content)
+        
+        # Compute deterministic artifact hash (metadata-based, content-addressable)
+        from src.core.hash_propagation import hash_artifact
+        artifact_hash_input = {
+            "artifact_type": artifact_type,
+            "name": name,
+            "content": content,
+            "phase_name": phase_name or "",
+            "metadata": {
+                "phase_name": phase_name,
+                "content_hash": content_hash,
+                "size_bytes": len(content),
+                "source_engine": source_engine,
+                "parent_artifact_id": parent_artifact_id,
+                "subdir": subdir,
+                **(metadata or {}),
+            },
+        }
+        from src.core.hashing import compute_hash
+        artifact_hash = compute_hash(artifact_hash_input)
 
         # 3. Persist to database
         async with async_session_factory() as session:
@@ -78,9 +98,11 @@ class ArtifactStore:
                 phase_name=phase_name or None,
                 content=content[:10000],  # Truncate for DB storage
                 file_path=str(file_path),
+                artifact_hash=artifact_hash,
                 metadata_={
                     "phase_name": phase_name,
                     "content_hash": content_hash,
+                    "artifact_hash": artifact_hash,
                     "size_bytes": len(content),
                     "source_engine": source_engine,
                     "parent_artifact_id": parent_artifact_id,

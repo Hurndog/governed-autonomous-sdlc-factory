@@ -49,6 +49,10 @@ class TraceabilityManager:
             target_id=target_id,
             link_type=link_type,
         )
+        # Compute edge hash
+        from src.core.hash_propagation import hash_traceability_link
+        hash_traceability_link(link)
+
         session.add(link)
         await session.flush()
 
