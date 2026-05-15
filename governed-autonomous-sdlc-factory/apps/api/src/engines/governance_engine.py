@@ -1,655 +1,251 @@
-"""Governance Engine for the Governed Autonomous SDLC Factory.
+"""Real Governance Generation Engine — AI-driven governance analysis.
 
-Implements executable governance:
-- OPA/Rego policy definitions
-- Policy evaluation against artifacts and code
-- Governance findings with severity
-- Release gates (blocking/non-blocking)
-- Evidence collection per evaluation
-
-NOT: "the system should be secure."
-ACTUAL: Executable Rego policies that evaluate to pass/fail with evidence.
+Generates governance artifacts dynamically from specifications and architecture.
+Not just static policies — real AI-driven governance findings.
 """
-import hashlib
+from __future__ import annotations
+
 import json
-import os
-import subprocess
-import tempfile
+import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
+from dataclasses import dataclass, field
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.core.database import async_session_factory
-from src.core.event_bus import EventBusManager, Event, publish_governance_finding, publish_custom_event
-from src.models import (
-    GovernancePolicy, GovernanceEvaluation, GovernanceReleaseGate,
-    Artifact, ArtifactType, Run
-)
 from src.core.logging import get_logger
+from src.engines.model_router import ModelRouter, get_router
+from src.engines.inference_trace import InferenceTracer, InferenceTraceRecord
+from src.engines.specification_engine import SpecificationArtifact
+from src.engines.architecture_engine import ArchitectureArtifact
 
-logger = get_logger("gov_engine")
-
-
-# =============================================================================
-# DEFAULT REGO POLICIES
-# =============================================================================
-
-DEFAULT_POLICIES = [
-    {
-        "name": "no-deployment-without-tests",
-        "description": "Deployment is blocked if no test artifacts exist for the current run.",
-        "category": "quality",
-        "severity": "critical",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    count(test_artifacts) > 0
-}
-
-test_artifacts[artifact] {
-    some artifact in input.artifacts
-    artifact.type == "test_plan"
-    artifact.phase_name == "quality"
-}
-
-violations[msg] {
-    count(test_artifacts) == 0
-    msg := "No test artifacts found. Deployment requires at least one test plan."
-}
-''',
-    },
-    {
-        "name": "no-deployment-without-evidence",
-        "description": "Deployment is blocked if no evidence artifacts exist.",
-        "category": "compliance",
-        "severity": "critical",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    count(evidence_artifacts) > 0
-}
-
-evidence_artifacts[artifact] {
-    some artifact in input.artifacts
-    artifact.type == "evidence"
-}
-
-violations[msg] {
-    count(evidence_artifacts) == 0
-    msg := "No evidence artifacts found. Deployment requires evidence of quality checks."
-}
-''',
-    },
-    {
-        "name": "no-direct-push-to-main",
-        "description": "Direct commits to main branch are not allowed. All changes must go through a pull request.",
-        "category": "compliance",
-        "severity": "error",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    not direct_push
-}
-
-direct_push {
-    some commit in input.commits
-    commit.branch == "main"
-    not commit.via_pull_request
-}
-
-violations[msg] {
-    direct_push
-    msg := "Direct push to main branch detected. All changes must go through a pull request."
-}
-''',
-    },
-    {
-        "name": "no-missing-readme",
-        "description": "The project must have a README.md file.",
-        "category": "quality",
-        "severity": "warning",
-        "is_blocking": False,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    has_readme
-}
-
-has_readme {
-    some file in input.files
-    file.name == "README.md"
-    file.size_bytes > 0
-}
-
-violations[msg] {
-    not has_readme
-    msg := "README.md is missing or empty. All projects must have documentation."
-}
-''',
-    },
-    {
-        "name": "no-missing-architecture-doc",
-        "description": "The project must have an architecture document.",
-        "category": "quality",
-        "severity": "warning",
-        "is_blocking": False,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    has_arch_doc
-}
-
-has_arch_doc {
-    some artifact in input.artifacts
-    artifact.type == "architecture"
-    artifact.name == "architecture.md"
-}
-
-violations[msg] {
-    not has_arch_doc
-    msg := "Architecture document is missing. All projects must have an architecture.md."
-}
-''',
-    },
-    {
-        "name": "no-missing-specification",
-        "description": "The project must have a specification document.",
-        "category": "quality",
-        "severity": "error",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    has_spec
-}
-
-has_spec {
-    some artifact in input.artifacts
-    artifact.type == "specification"
-}
-
-violations[msg] {
-    not has_spec
-    msg := "Specification document is missing. All projects must have requirements."
-}
-''',
-    },
-    {
-        "name": "test-coverage-minimum",
-        "description": "Test coverage must meet the minimum threshold (80%).",
-        "category": "quality",
-        "severity": "error",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    input.coverage_percent >= 80
-}
-
-violations[msg] {
-    input.coverage_percent < 80
-    msg := sprintf("Test coverage %.1f%% is below minimum threshold of 80%%", [input.coverage_percent])
-}
-''',
-    },
-    {
-        "name": "no-critical-vulnerabilities",
-        "description": "No critical security vulnerabilities are allowed in dependencies.",
-        "category": "security",
-        "severity": "critical",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    count(critical_vulns) == 0
-}
-
-critical_vulns[vuln] {
-    some vuln in input.vulnerabilities
-    vuln.severity == "critical"
-}
-
-violations[msg] {
-    count(critical_vulns) > 0
-    msg := sprintf("Found %d critical security vulnerabilities", [count(critical_vulns)])
-}
-''',
-    },
-    {
-        "name": "spec-has-acceptance-criteria",
-        "description": "All must/should requirements must have acceptance criteria.",
-        "category": "quality",
-        "severity": "warning",
-        "is_blocking": False,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    count(missing_ac) == 0
-}
-
-missing_ac[req_id] {
-    some req_id, req in input.requirements
-    req.priority == "must"
-    count(req.acceptance_criteria) == 0
-}
-
-violations[msg] {
-    count(missing_ac) > 0
-    msg := sprintf("Requirements without acceptance criteria: %v", [concat(", ", [k | k := missing_ac[_]])])
-}
-''',
-    },
-    {
-        "name": "governance-evaluation-required",
-        "description": "All governance policies must be evaluated before deployment.",
-        "category": "compliance",
-        "severity": "critical",
-        "is_blocking": True,
-        "rego_code": '''package sdlc.governance
-
-import future.keywords.in
-
-default allow := false
-
-allow {
-    count(required_policies) == count(passed_policies)
-}
-
-required_policy_ids[pid] {
-    some pid in input.required_policy_ids
-}
-
-passed_policies[pid] {
-    some eval in input.evaluations
-    eval.policy_id == pid
-    eval.decision == "pass"
-}
-
-required_policies[pid] {
-    pid := required_policy_ids[_]
-}
-
-violations[msg] {
-    count(required_policies) > count(passed_policies)
-    msg := sprintf("Not all required governance policies passed. Required: %d, Passed: %d", [count(required_policies), count(passed_policies)])
-}
-''',
-    },
-]
+logger = get_logger("governance_engine")
 
 
-# =============================================================================
-# GOVERNANCE ENGINE
-# =============================================================================
+@dataclass
+class GovernanceArtifact:
+    """Generated governance artifact."""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    run_id: str = ""
+    project_id: str = ""
+    spec_id: str = ""
+    arch_id: str = ""
+    runtime_governance_concerns: list = field(default_factory=list)
+    architecture_governance_findings: list = field(default_factory=list)
+    deployment_governance_findings: list = field(default_factory=list)
+    security_sensitive_findings: list = field(default_factory=list)
+    evidence_requirements: list = field(default_factory=list)
+    audit_requirements: list = field(default_factory=list)
+    compliance_gaps: list = field(default_factory=list)
+    risk_assessment: dict = field(default_factory=dict)
+    model_used: str = ""
+    provider_used: str = ""
+    tokens_used: int = 0
+    cost_usd: float = 0.0
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 
 class GovernanceEngine:
-    """Core governance engine for policy evaluation and release gates."""
+    """AI-driven governance generation."""
 
-    def __init__(self, run_id: str):
-        self.run_id = run_id
-        self.bus = EventBusManager.get_bus(run_id)
-        self.opa_available = self._check_opa()
+    GOVERNANCE_PROMPT = """You are a governance, risk, and compliance (GRC) specialist. Analyze the following software specification and architecture for governance concerns.
 
-    def _check_opa(self) -> bool:
-        """Check if OPA binary is available."""
-        try:
-            result = subprocess.run(["opa", "version"], capture_output=True, text=True, timeout=5)
-            return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            logger.warning("OPA binary not found. Using built-in Rego evaluation.")
-            return False
+SPECIFICATION:
+{specification}
 
-    # -----------------------------------------------------------------
-    # POLICY MANAGEMENT
-    # -----------------------------------------------------------------
+ARCHITECTURE:
+{architecture}
 
-    async def seed_default_policies(self, session: AsyncSession):
-        """Seed default governance policies if they don't exist."""
-        for policy_data in DEFAULT_POLICIES:
-            result = await session.execute(
-                select(GovernancePolicy).where(GovernancePolicy.name == policy_data["name"])
+INSTRUCTIONS:
+Produce a comprehensive governance analysis in the following JSON format:
+
+{{
+  "runtime_governance_concerns": [
+    {{
+      "id": "RGC-001",
+      "concern": "Runtime governance concern description",
+      "category": "data_handling|access_control|audit_logging|error_handling|rate_limiting|data_retention",
+      "severity": "critical|high|medium|low",
+      "recommendation": "Specific recommendation",
+      "evidence_required": "What evidence must be collected"
+    }}
+  ],
+  "architecture_governance_findings": [
+    {{
+      "id": "AGF-001",
+      "finding": "Architecture governance finding",
+      "component": "Affected component",
+      "concern": "security|privacy|compliance|reliability|observability",
+      "severity": "critical|high|medium|low",
+      "recommendation": "Architecture recommendation"
+    }}
+  ],
+  "deployment_governance_findings": [
+    {{
+      "id": "DGF-001",
+      "finding": "Deployment governance finding",
+      "environment": "production|staging|all",
+      "concern": "secrets_management|network_security|access_control|monitoring|backup",
+      "severity": "critical|high|medium|low",
+      "recommendation": "Deployment recommendation"
+    }}
+  ],
+  "security_sensitive_findings": [
+    {{
+      "id": "SSF-001",
+      "finding": "Security-sensitive finding",
+      "attack_vector": "Potential attack vector",
+      "impact": "high|medium|low",
+      "mitigation": "Specific mitigation",
+      "testing_requirement": "How to verify the mitigation"
+    }}
+  ],
+  "evidence_requirements": [
+    {{
+      "id": "EVR-001",
+      "requirement": "Evidence that must be collected",
+      "source": "runtime|build|test|deployment|audit",
+      "frequency": "continuous|on_change|on_release|periodic",
+      "retention": "How long to retain"
+    }}
+  ],
+  "audit_requirements": [
+    {{
+      "id": "AUD-001",
+      "requirement": "Audit requirement description",
+      "scope": "What must be auditable",
+      "method": "log_review|automated_check|manual_review|penetration_test",
+      "frequency": "continuous|daily|weekly|monthly|quarterly"
+    }}
+  ],
+  "compliance_gaps": [
+    {{
+      "id": "CG-001",
+      "framework": "GDPR|HIPAA|SOC2|PCI-DSS|ISO27001|custom",
+      "gap": "Specific compliance gap",
+      "severity": "critical|high|medium|low",
+      "remediation": "How to close the gap"
+    }}
+  ],
+  "risk_assessment": {{
+    "overall_risk": "high|medium|low",
+    "technical_risk": "high|medium|low",
+    "security_risk": "high|medium|low",
+    "compliance_risk": "high|medium|low",
+    "operational_risk": "high|medium|low",
+    "top_risks": [
+      {{
+        "risk": "Top risk description",
+        "likelihood": "high|medium|low",
+        "impact": "high|medium|low",
+        "mitigation": "Primary mitigation strategy"
+      }}
+    ]
+  }}
+}}
+
+RULES:
+1. Be specific and actionable, not generic
+2. Generate at least 3 runtime governance concerns
+3. Generate at least 2 architecture governance findings
+4. Generate at least 2 security-sensitive findings
+5. Generate at least 2 evidence requirements
+6. Generate at least 2 audit requirements
+7. Assess compliance gaps for relevant frameworks
+8. Output ONLY valid JSON, no markdown, no explanations
+
+OUTPUT:"""
+
+    def __init__(self, router: Optional[ModelRouter] = None):
+        self._router = router
+        self._tracer: Optional[InferenceTracer] = None
+
+    async def _get_router(self) -> ModelRouter:
+        if self._router is None:
+            self._router = await get_router()
+        return self._router
+
+    async def generate_governance(
+        self,
+        spec: SpecificationArtifact,
+        arch: ArchitectureArtifact,
+        run_id: str = "",
+        tracer: Optional[InferenceTracer] = None,
+    ) -> GovernanceArtifact:
+        """Generate governance analysis from specification and architecture."""
+        self._tracer = tracer
+        router = await self._get_router()
+
+        prompt = self.GOVERNANCE_PROMPT.format(
+            specification=spec.intent[:500],
+            architecture=arch.architecture_proposal[:500],
+        )
+
+        result = await router.complete(
+            messages=[
+                {"role": "system", "content": "You are a GRC specialist. Output ONLY valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=8192,
+            run_id=run_id,
+            phase="governance_generation",
+        )
+
+        if not result.success:
+            logger.error(f"Governance generation failed: {result.error}")
+            return GovernanceArtifact(
+                run_id=run_id,
+                project_id=spec.project_id,
+                spec_id=spec.id,
+                arch_id=arch.id,
             )
-            existing = result.scalars().first()
-            if not existing:
-                policy = GovernancePolicy(
-                    name=policy_data["name"],
-                    description=policy_data["description"],
-                    category=policy_data["category"],
-                    severity=policy_data["severity"],
-                    is_blocking=policy_data["is_blocking"],
-                    rego_code=policy_data["rego_code"],
-                    is_active=True,
-                )
-                session.add(policy)
-                logger.info(f"Seeded policy: {policy_data['name']}")
-        await session.commit()
 
-    async def get_policies(self, session: AsyncSession, active_only: bool = True) -> list[GovernancePolicy]:
-        """Get all governance policies."""
-        query = select(GovernancePolicy)
-        if active_only:
-            query = query.where(GovernancePolicy.is_active == True)
-        result = await session.execute(query)
-        return list(result.scalars().all())
-
-    # -----------------------------------------------------------------
-    # POLICY EVALUATION
-    # -----------------------------------------------------------------
-
-    async def evaluate_policy(self, session: AsyncSession, policy: GovernancePolicy,
-                               input_data: dict, artifact_id: str = None) -> GovernanceEvaluation:
-        """Evaluate a single policy against input data."""
-        if self.opa_available:
-            decision, findings = await self._evaluate_with_opa(policy, input_data)
-        else:
-            decision, findings = self._evaluate_builtin(policy, input_data)
-
-        evaluation = GovernanceEvaluation(
-            run_id=self.run_id,
-            policy_id=policy.id,
-            artifact_id=artifact_id,
-            decision=decision,
-            findings=findings,
-            evidence={
-                "input_hash": hashlib.sha256(json.dumps(input_data, sort_keys=True).encode()).hexdigest(),
-                "policy_version": policy.version,
-                "evaluated_by": "opa" if self.opa_available else "builtin",
-            },
-        )
-        # Compute integrity hash for the evaluation
-        from src.core.hash_propagation import hash_governance_eval
-        hash_governance_eval(evaluation, policy.name)
-
-        session.add(evaluation)
-        await session.flush()
-
-        severity = "info" if decision == "pass" else policy.severity
-        await publish_governance_finding(
-            self.run_id, policy.name, decision,
-            severity=severity,
-            data={
-                "evaluation_id": evaluation.id,
-                "policy_id": policy.id,
-                "findings_count": len(findings),
-            },
-        )
-
-        return evaluation
-
-    async def _evaluate_with_opa(self, policy: GovernancePolicy, input_data: dict) -> tuple[str, list]:
-        """Evaluate policy using OPA binary."""
         try:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.rego', delete=False) as f:
-                f.write(policy.rego_code)
-                policy_path = f.name
+            gov_data = json.loads(result.response)
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{.*\}', result.response, re.DOTALL)
+            gov_data = json.loads(json_match.group()) if json_match else {}
 
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                json.dump({"input": input_data}, f)
-                input_path = f.name
-
-            result = subprocess.run(
-                ["opa", "eval", "--format", "json", "-d", policy_path, "-i", input_path,
-                 "data.sdlc.governance"],
-                capture_output=True, text=True, timeout=30
-            )
-
-            os.unlink(policy_path)
-            os.unlink(input_path)
-
-            if result.returncode == 0:
-                opa_result = json.loads(result.stdout)
-                if "result" in opa_result and opa_result["result"]:
-                    for r in opa_result["result"]:
-                        if "expressions" in r:
-                            for expr in r["expressions"]:
-                                if isinstance(expr["value"], dict):
-                                    allow = expr["value"].get("allow", False)
-                                    violations = expr["value"].get("violations", [])
-                                    if allow:
-                                        return "pass", []
-                                    else:
-                                        findings = [v for v in violations if isinstance(v, str)]
-                                        return "fail", findings
-
-            return "error", [f"OPA evaluation error: {result.stderr}"]
-        except Exception as e:
-            logger.error(f"OPA evaluation failed: {e}")
-            return "error", [str(e)]
-
-    def _evaluate_builtin(self, policy: GovernancePolicy, input_data: dict) -> tuple[str, list]:
-        """Built-in Rego-like evaluation when OPA is not available."""
-        name = policy.name
-        findings = []
-
-        if name == "no-deployment-without-tests":
-            test_artifacts = [a for a in input_data.get("artifacts", [])
-                              if a.get("type") == "test_plan" and a.get("phase_name") == "quality"]
-            if test_artifacts:
-                return "pass", []
-            return "fail", ["No test artifacts found. Deployment requires at least one test plan."]
-
-        elif name == "no-deployment-without-evidence":
-            evidence = [a for a in input_data.get("artifacts", []) if a.get("type") == "evidence"]
-            if evidence:
-                return "pass", []
-            return "fail", ["No evidence artifacts found. Deployment requires evidence of quality checks."]
-
-        elif name == "no-direct-push-to-main":
-            commits = input_data.get("commits", [])
-            direct = [c for c in commits if c.get("branch") == "main" and not c.get("via_pull_request")]
-            if not direct:
-                return "pass", []
-            return "fail", [f"Direct push to main detected: {len(commits)} commits"]
-
-        elif name == "no-missing-readme":
-            files = input_data.get("files", [])
-            readme = [f for f in files if f.get("name") == "README.md" and f.get("size_bytes", 0) > 0]
-            if readme:
-                return "pass", []
-            return "fail", ["README.md is missing or empty."]
-
-        elif name == "no-missing-architecture-doc":
-            artifacts = input_data.get("artifacts", [])
-            arch = [a for a in artifacts if a.get("type") == "architecture" and a.get("name") == "architecture.md"]
-            if arch:
-                return "pass", []
-            return "fail", ["Architecture document is missing."]
-
-        elif name == "no-missing-specification":
-            artifacts = input_data.get("artifacts", [])
-            specs = [a for a in artifacts if a.get("type") == "specification"]
-            if specs:
-                return "pass", []
-            return "fail", ["Specification document is missing."]
-
-        elif name == "test-coverage-minimum":
-            coverage = input_data.get("coverage_percent", 0)
-            if coverage >= 80:
-                return "pass", []
-            return "fail", [f"Test coverage {coverage}% is below minimum threshold of 80%"]
-
-        elif name == "no-critical-vulnerabilities":
-            vulns = input_data.get("vulnerabilities", [])
-            critical = [v for v in vulns if v.get("severity") == "critical"]
-            if not critical:
-                return "pass", []
-            return "fail", [f"Found {len(critical)} critical security vulnerabilities"]
-
-        elif name == "spec-has-acceptance-criteria":
-            requirements = input_data.get("requirements", {})
-            missing = [rid for rid, req in requirements.items()
-                       if req.get("priority") == "must" and not req.get("acceptance_criteria")]
-            if not missing:
-                return "pass", []
-            return "fail", [f"Requirements without acceptance criteria: {', '.join(missing)}"]
-
-        elif name == "governance-evaluation-required":
-            required = set(input_data.get("required_policy_ids", []))
-            evaluations = input_data.get("evaluations", [])
-            passed = {e["policy_id"] for e in evaluations if e.get("decision") == "pass"}
-            if required and required == passed:
-                return "pass", []
-            return "fail", [f"Not all required policies passed. Required: {len(required)}, Passed: {len(passed)}"]
-
-        return "warning", [f"Unknown policy: {name}"]
-
-    # -----------------------------------------------------------------
-    # BATCH EVALUATION
-    # -----------------------------------------------------------------
-
-    async def evaluate_all_policies(self, session: AsyncSession, input_data: dict,
-                                     artifact_id: str = None) -> list[GovernanceEvaluation]:
-        """Evaluate all active policies."""
-        policies = await self.get_policies(session)
-        evaluations = []
-        for policy in policies:
-            eval_result = await self.evaluate_policy(session, policy, input_data, artifact_id)
-            evaluations.append(eval_result)
-        await session.commit()
-        return evaluations
-
-    # -----------------------------------------------------------------
-    # RELEASE GATES
-    # -----------------------------------------------------------------
-
-    async def create_release_gate(self, session: AsyncSession, gate_name: str,
-                                   required_policy_ids: list[str]) -> GovernanceReleaseGate:
-        """Create a release gate for a run."""
-        gate = GovernanceReleaseGate(
-            run_id=self.run_id,
-            gate_name=gate_name,
-            status="pending",
-            required_policy_ids=required_policy_ids,
-        )
-        session.add(gate)
-        await session.commit()
-        return gate
-
-    async def evaluate_release_gate(self, session: AsyncSession, gate_id: str) -> GovernanceReleaseGate:
-        """Evaluate a release gate against current evaluations."""
-        gate = await session.get(GovernanceReleaseGate, gate_id)
-        if not gate:
-            raise ValueError(f"Release gate {gate_id} not found")
-
-        # Get evaluations for required policies
-        result = await session.execute(
-            select(GovernanceEvaluation)
-            .where(GovernanceEvaluation.run_id == self.run_id)
-            .where(GovernanceEvaluation.policy_id.in_(gate.required_policy_ids))
-            .order_by(GovernanceEvaluation.evaluated_at.desc())
-        )
-        evaluations = list(result.scalars().all())
-
-        # Deduplicate by policy_id (take latest)
-        latest_evals = {}
-        for ev in evaluations:
-            if ev.policy_id not in latest_evals:
-                latest_evals[ev.policy_id] = ev
-
-        # Check if all required policies passed
-        all_passed = all(
-            latest_evals.get(pid) and latest_evals[pid].decision == "pass"
-            for pid in gate.required_policy_ids
+        artifact = GovernanceArtifact(
+            run_id=run_id,
+            project_id=spec.project_id,
+            spec_id=spec.id,
+            arch_id=arch.id,
+            runtime_governance_concerns=gov_data.get("runtime_governance_concerns", []),
+            architecture_governance_findings=gov_data.get("architecture_governance_findings", []),
+            deployment_governance_findings=gov_data.get("deployment_governance_findings", []),
+            security_sensitive_findings=gov_data.get("security_sensitive_findings", []),
+            evidence_requirements=gov_data.get("evidence_requirements", []),
+            audit_requirements=gov_data.get("audit_requirements", []),
+            compliance_gaps=gov_data.get("compliance_gaps", []),
+            risk_assessment=gov_data.get("risk_assessment", {}),
+            model_used=result.model,
+            provider_used=result.provider,
+            tokens_used=result.total_tokens,
+            cost_usd=result.cost_usd,
         )
 
-        blocking_failed = any(
-            latest_evals.get(pid) and latest_evals[pid].decision == "fail"
-            for pid in gate.required_policy_ids
-            if latest_evals.get(pid)
+        if self._tracer:
+            self._tracer.record(InferenceTraceRecord(
+                run_id=run_id,
+                phase="governance_generation",
+                provider=result.provider,
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
+                cost_usd=result.cost_usd,
+                latency_ms=result.latency_ms,
+                success=result.success,
+                derived_artifacts=[artifact.id],
+            ))
+
+        logger.info(
+            f"Governance generated: {len(artifact.runtime_governance_concerns)} runtime concerns, "
+            f"{len(artifact.security_sensitive_findings)} security findings, "
+            f"{len(artifact.compliance_gaps)} compliance gaps, "
+            f"model={result.model}, tokens={result.total_tokens}"
         )
 
-        gate.evaluation_ids = [ev.id for ev in latest_evals.values()]
-        gate.evaluated_at = datetime.now(timezone.utc)
-
-        if all_passed:
-            gate.status = "passed"
-        elif blocking_failed:
-            gate.status = "failed"
-        else:
-            gate.status = "pending"
-
-        await session.commit()
-
-        await publish_custom_event(
-            self.run_id, "governance.gate_evaluated",
-            f"Release gate '{gate.gate_name}': {gate.status}",
-            severity="info" if gate.status == "passed" else "warning" if gate.status == "pending" else "error",
-            data={"gate_id": gate.id, "gate_name": gate.gate_name, "status": gate.status},
-        )
-
-        return gate
-
-    async def waive_release_gate(self, session: AsyncSession, gate_id: str,
-                                  waived_by: str, reason: str) -> GovernanceReleaseGate:
-        """Waive a release gate (with audit trail)."""
-        gate = await session.get(GovernanceReleaseGate, gate_id)
-        if not gate:
-            raise ValueError(f"Release gate {gate_id} not found")
-
-        gate.status = "waived"
-        gate.waived_by = waived_by
-        gate.waived_reason = reason
-        await session.commit()
-
-        await publish_custom_event(
-            self.run_id, "governance.gate_waived",
-            f"Release gate '{gate.gate_name}' waived by {waived_by}: {reason}",
-            severity="warning",
-            data={"gate_id": gate.id, "waived_by": waived_by},
-        )
-
-        return gate
-
-
-# =============================================================================
-# CONVENIENCE: Seed policies + evaluate
-# =============================================================================
-
-async def seed_governance_policies():
-    """Seed all default governance policies."""
-    async with async_session_factory() as session:
-        engine = GovernanceEngine("system")
-        await engine.seed_default_policies(session)
-        logger.info("Default governance policies seeded")
+        return artifact

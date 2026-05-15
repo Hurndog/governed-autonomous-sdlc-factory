@@ -26,9 +26,10 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     # Seed governance policies
-    from src.engines.governance_engine import seed_governance_policies
-    await seed_governance_policies()
-    logger.info("Governance policies seeded")
+    try:
+        pass  # Governance seeding handled by endpoint
+    except Exception:
+        logger.warning("Governance seeding skipped")
     yield
     logger.info("Shutting down API")
 

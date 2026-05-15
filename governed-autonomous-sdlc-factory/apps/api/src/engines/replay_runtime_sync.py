@@ -150,7 +150,7 @@ class ReplayRuntimeSync:
                 started_at=ctx.started_at,
             )
             session.add(replay_session)
-            session.flush()  # Flush to satisfy FK constraints for replay_events
+            txn.flush()  # Flush through transaction manager to satisfy FK constraints
 
             # Phase 1: Reconstruct
             ctx.phase = "reconstructing"
