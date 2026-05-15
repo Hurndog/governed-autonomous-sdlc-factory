@@ -33,3 +33,18 @@ async def get_db() -> AsyncSession:
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migration: make task_id nullable and drop FK constraint if exists
+        try:
+            from sqlalchemy import text
+            await conn.execute(text(
+                "ALTER TABLE artifacts ALTER COLUMN task_id DROP NOT NULL"
+            ))
+        except Exception:
+            pass  # Column may already be nullable
+        try:
+            from sqlalchemy import text
+            await conn.execute(text(
+                "ALTER TABLE artifacts DROP CONSTRAINT IF EXISTS artifacts_task_id_fkey"
+            ))
+        except Exception:
+            pass  # Constraint may not exist

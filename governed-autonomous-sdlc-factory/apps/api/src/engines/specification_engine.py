@@ -458,7 +458,7 @@ class SpecificationEngine:
             artifact = Artifact(
                 run_id=self.run_id,
                 name=name,
-                type=atype,
+                artifact_type=atype,
                 phase_name="specification",
                 content=content[:10000],  # Truncate for DB storage
                 metadata_={"spec_version_id": spec.id, "version": version_num},

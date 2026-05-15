@@ -406,6 +406,8 @@ class TestPlanGenerator:
         test_plan = TestPlan(
             run_id=self.run_id,
             project_id=self.project_id,
+            name=f"Test Plan v{version_num}",
+            description=f"Auto-generated test plan with {len(self.test_cases)} test cases",
             version=version_num,
             status="draft",
             unit_test_strategy=plan_data["unit_test_strategy"],
@@ -425,16 +427,29 @@ class TestPlanGenerator:
         artifact = Artifact(
             run_id=self.run_id,
             name="test-plan.json",
-            type=ArtifactType.TEST_PLAN,
+            artifact_type=ArtifactType.TEST_PLAN,
             phase_name="quality",
             content=json.dumps(plan_data, indent=2)[:10000],
             metadata_={"test_plan_id": test_plan.id, "version": version_num},
         )
         session.add(artifact)
 
-        # Create traceability links
+        # Create traceability links (idempotent — check existence before insert)
         for req_id, test_ids in self.traceability_map.items():
             for test_id in test_ids:
+                # Check if link already exists (from previous run or earlier in this run)
+                existing_result = await session.execute(
+                    select(TraceabilityLink).where(
+                        TraceabilityLink.run_id == self.run_id,
+                        TraceabilityLink.source_type == "requirement",
+                        TraceabilityLink.source_id == req_id,
+                        TraceabilityLink.target_type == "test",
+                        TraceabilityLink.target_id == test_id,
+                        TraceabilityLink.link_type == "validates",
+                    )
+                )
+                if existing_result.scalars().first():
+                    continue
                 link = TraceabilityLink(
                     run_id=self.run_id,
                     source_type="requirement",
@@ -444,6 +459,7 @@ class TestPlanGenerator:
                     link_type="validates",
                 )
                 session.add(link)
+                await session.flush()
 
         await session.commit()
         self._version = test_plan

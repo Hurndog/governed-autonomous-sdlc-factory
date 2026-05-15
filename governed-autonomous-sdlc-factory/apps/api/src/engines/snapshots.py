@@ -63,7 +63,7 @@ class SnapshotManager:
         artifacts = artifacts_result.scalars().all()
         artifact_states = {
             a.name: {
-                "type": a.type.value if hasattr(a.type, 'value') else str(a.type),
+                "type": a.artifact_type,
                 "phase": a.phase_name,
                 "created_at": a.created_at.isoformat() if a.created_at else None,
             }
@@ -99,7 +99,7 @@ class SnapshotManager:
             "run": {
                 "id": run.id,
                 "name": run.name,
-                "status": run.status.value if hasattr(run.status, 'value') else str(run.status),
+                "status": str(run.status),
                 "created_at": run.created_at.isoformat() if run.created_at else None,
             },
             "snapshot_type": snapshot_type,

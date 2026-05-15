@@ -431,7 +431,7 @@ class ArchitectureEngine:
             artifact = Artifact(
                 run_id=self.run_id,
                 name=name,
-                type=atype,
+                artifact_type=atype,
                 phase_name="architecture",
                 content=content[:10000],
                 metadata_={"arch_version_id": arch.id, "version": version_num},

@@ -6,7 +6,7 @@ from typing import Optional, List
 
 from sqlalchemy import (
     String, Text, Integer, Float, Boolean, DateTime, ForeignKey,
-    JSON, Enum as SAEnum, UniqueConstraint, Index
+    JSON, Enum as SAEnum, UniqueConstraint, Index, and_
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -172,17 +172,23 @@ class Task(Base):
     governance_check_ids: Mapped[Optional[dict]] = mapped_column(JSONB, default=[])
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     phase: Mapped["Phase"] = relationship(back_populates="tasks")
-    artifacts: Mapped[List["Artifact"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    artifacts: Mapped[List["Artifact"]] = relationship(
+        back_populates="task",
+        primaryjoin="and_(Task.id == Artifact.task_id, Artifact.task_id.is_not(None))",
+        foreign_keys="[Artifact.task_id]",
+        passive_deletes=True,
+    )
 
 
 # 5.3.6 artifacts
 class Artifact(Base):
     __tablename__ = "artifacts"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_id: Mapped[str] = mapped_column(String(36), ForeignKey("tasks.id"), nullable=False)
+    task_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     run_id: Mapped[str] = mapped_column(String(36), ForeignKey("runs.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     artifact_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    phase_name: Mapped[Optional[str]] = mapped_column(String(100))
     content: Mapped[Optional[str]] = mapped_column(Text)
     file_path: Mapped[Optional[str]] = mapped_column(String(500))
     version: Mapped[int] = mapped_column(Integer, default=1)
@@ -190,7 +196,12 @@ class Artifact(Base):
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, default={})
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    task: Mapped["Task"] = relationship(back_populates="artifacts")
+    task: Mapped[Optional["Task"]] = relationship(
+        back_populates="artifacts",
+        primaryjoin="Artifact.task_id == Task.id",
+        foreign_keys="[Artifact.task_id]",
+        uselist=False,
+    )
 
 
 # 5.3.7 approvals
