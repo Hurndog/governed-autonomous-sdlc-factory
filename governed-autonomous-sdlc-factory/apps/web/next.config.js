@@ -14,6 +14,9 @@ const nextConfig = {
       },
     ];
   },
+  experimental: {
+    serverComponentsExternalPackages: ['mermaid'],
+  },
 };
 
 module.exports = nextConfig;
