@@ -25,6 +25,15 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Governed Autonomous SDLC Factory API")
     await init_db()
     logger.info("Database initialized")
+
+    # Run startup diagnostics
+    try:
+        from src.core.startup_diagnostics import run_startup_diagnostics
+        diag_results = await run_startup_diagnostics()
+        summary = diag_results.get("_summary", {})
+        logger.info(f"Startup diagnostics: {summary.get('passed', 0)}/{summary.get('total_checks', 0)} passed")
+    except Exception as e:
+        logger.warning(f"Startup diagnostics failed: {e}")
     # Seed governance policies
     try:
         pass  # Governance seeding handled by endpoint

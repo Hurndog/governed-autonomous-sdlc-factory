@@ -25,6 +25,7 @@ from src.engines.model_providers import (
     BaseProvider, LMStudioProvider, OpenAIProvider, AnthropicProvider,
     InferenceResult, ProviderType,
 )
+from src.engines.ollama_provider import OllamaProvider
 from src.engines.model_registry import ModelRegistry, ModelEntry
 
 logger = get_logger("model_router")
@@ -88,12 +89,50 @@ class ModelRouter:
         """Initialize providers from configuration."""
         self.registry.load_defaults()
 
-        # Initialize LM Studio (local, always try first)
+        # Initialize LM Studio (local, try first)
         lm_studio = LMStudioProvider(
             base_url=settings.lm_studio_url,
             api_key="lm-studio",
         )
         self._providers[ProviderType.LM_STUDIO.value] = lm_studio
+
+        # Initialize Ollama (local, always available)
+        ollama = OllamaProvider(base_url="http://localhost:11434")
+        self._providers[ProviderType.OLLAMA.value] = ollama
+
+        # Probe Ollama availability and register models
+        try:
+            import httpx
+            resp = await httpx.AsyncClient().get("http://localhost:11434/api/tags", timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                for m in data.get("models", []):
+                    model_name = m["name"]
+                    is_reasoning = "gpt-oss" in model_name or "qwen" in model_name
+                    ctx_len = 131072 if "gpt-oss" in model_name else 32768 if "qwen" in model_name else 4096
+                    from src.engines.model_registry import ModelEntry
+                    from src.engines.model_providers import ModelCapabilities
+                    self.registry.register(ModelEntry(
+                        model_id=model_name,
+                        provider=ProviderType.OLLAMA.value,
+                        display_name=f"Ollama: {model_name}",
+                        capabilities=ModelCapabilities(
+                            model_id=model_name,
+                            provider=ProviderType.OLLAMA.value,
+                            context_length=ctx_len,
+                            supports_streaming=False,
+                            supports_structured_output=is_reasoning,
+                            supports_reasoning=is_reasoning,
+                            cost_per_1k_prompt_tokens=0.0,
+                            cost_per_1k_completion_tokens=0.0,
+                            latency_tier="low" if "1.5b" in model_name else "medium",
+                        ),
+                        is_available=True,
+                        priority=100 if "gpt-oss" in model_name else 50,
+                    ))
+                    logger.info(f"Ollama model registered: {model_name}")
+        except Exception as e:
+            logger.warning(f"Ollama not available: {e}")
 
         # Initialize OpenAI if API key available
         if settings.openai_api_key:
