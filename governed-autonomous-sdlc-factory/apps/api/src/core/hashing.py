@@ -66,19 +66,39 @@ def compute_chain_hash(parent_hash: Optional[str], current_hash: str) -> str:
     return compute_hash_from_parts(parent, current_hash)
 
 
+def _filter_metadata_for_hash(metadata: Optional[dict]) -> dict:
+    """Filter metadata to only include hash-stable fields.
+
+    Excludes volatile/circular fields:
+    - artifact_hash: circular reference (hash of metadata includes hash)
+    - content_hash: derived from content, already included via content field
+    - size_bytes: derived from content
+    """
+    if not metadata:
+        return {}
+    EXCLUDED_FIELDS = {"artifact_hash", "content_hash", "size_bytes"}
+    safe = {}
+    for k, v in metadata.items():
+        if k in EXCLUDED_FIELDS:
+            continue
+        if isinstance(v, (str, int, float, bool, type(None))):
+            safe[k] = v
+        elif isinstance(v, (list, dict)):
+            safe[k] = v
+        else:
+            safe[k] = str(v)
+    return safe
+
+
 def compute_artifact_hash(artifact_type: str, name: str, content: Optional[str],
                            phase_name: Optional[str], metadata: Optional[dict]) -> str:
-    """Compute deterministic hash for an artifact."""
-    # Normalize metadata to ensure JSON serializable
-    safe_metadata = {}
-    if metadata:
-        for k, v in metadata.items():
-            if isinstance(v, (str, int, float, bool, type(None))):
-                safe_metadata[k] = v
-            elif isinstance(v, (list, dict)):
-                safe_metadata[k] = v
-            else:
-                safe_metadata[k] = str(v)
+    """Compute deterministic hash for an artifact.
+
+    The hash is computed over a canonical representation that excludes
+    volatile/circular fields (artifact_hash, content_hash, size_bytes)
+    to ensure the hash can be recomputed from stored data.
+    """
+    safe_metadata = _filter_metadata_for_hash(metadata)
     return compute_hash({
         "artifact_type": artifact_type,
         "name": name,
@@ -194,3 +214,66 @@ def verify_chain(hashes: list[str]) -> bool:
         chain_hash = compute_chain_hash(chain_hash, h)
     # The final chain hash should match the last element if stored
     return True  # Chain integrity verified by recomputation
+
+
+# ---------------------------------------------------------------------------
+# Structured output normalization
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+# Matches fenced JSON blocks: ```json ... ``` or ``` ... ```
+_FENCED_JSON_RE = _re.compile(
+    r"```(?:json)?\s*\n?(.*?)\n?```",
+    _re.DOTALL,
+)
+
+
+def extract_structured_output(raw: str) -> tuple[str, str]:
+    """Extract structured content from a model response.
+
+    Returns:
+        (normalized_content, raw_response)
+        - normalized_content: extracted JSON or cleaned text
+        - raw_response: the original raw response (for audit)
+
+    Handles:
+    - Plain JSON: {"key": "value"}
+    - Markdown-wrapped JSON: ```json\n{...}\n```
+    - Text with embedded JSON fences
+    """
+    if not raw:
+        return "", raw
+
+    stripped = raw.strip()
+
+    # Try direct JSON parse first
+    try:
+        parsed = json.loads(stripped)
+        return json.dumps(parsed, sort_keys=True, separators=(",", ":")), raw
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Try extracting from markdown fences
+    match = _FENCED_JSON_RE.search(stripped)
+    if match:
+        inner = match.group(1).strip()
+        try:
+            parsed = json.loads(inner)
+            return json.dumps(parsed, sort_keys=True, separators=(",", ":")), raw
+        except (json.JSONDecodeError, ValueError):
+            # Fence found but content isn't valid JSON — return inner text
+            return inner, raw
+
+    # Not JSON — return as-is
+    return stripped, raw
+
+
+def compute_raw_response_hash(raw_response: str) -> str:
+    """Compute hash over the exact raw model response (for audit)."""
+    return hashlib.sha256(raw_response.encode("utf-8")).hexdigest()
+
+
+def compute_normalized_content_hash(normalized_content: str) -> str:
+    """Compute hash over normalized content (for artifact integrity)."""
+    return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()

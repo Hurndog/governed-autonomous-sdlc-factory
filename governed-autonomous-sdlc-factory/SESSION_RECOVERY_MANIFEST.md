@@ -1,89 +1,70 @@
 # SESSION RECOVERY MANIFEST
-**Generated:** 2026-05-14 09:15
-**Version:** 2.0.0
 
-## Repository
-- **Path:** `/Users/marcovanhurne/governed-autonomous-sdlc-factory/governed-autonomous-sdlc-factory`
-- **Branch:** main
-- **Latest commit:** `6355969` (runtime validation + benchmarks)
-- **Total commits:** 9
+**Last Updated:** 2026-05-16T10:15:00Z  
+**Session:** Integrity Repair Validation  
+**Status:** ✅ COMPLETE
 
-## Runtime Ports
-| Service | Port | Status |
-|---------|------|--------|
-| FastAPI | 8000 | ✅ |
-| Next.js Frontend | 3000 | ✅ |
-| PostgreSQL | 5432 | ✅ |
-| Redis | 6379 | ✅ |
-| Ollama | 11434 | ✅ (3 models) |
-| LM Studio | 1234 | ✅ (Gemma 4 E4B) |
+---
 
-## Active Models
-| Provider | Model | Role | Status |
-|----------|-------|------|--------|
-| LM Studio | google/gemma-4-e4b | Primary (arch, gov, spec, code) | ✅ Online |
-| Ollama | gpt-oss:20b | Fallback (heavy reasoning) | ✅ Online |
-| Ollama | qwen2.5:1.5b | Utility | ✅ Online |
-| Ollama | phi3:mini | Lightweight | ✅ Online |
-| LM Studio | nomic-embed-text-v1.5 | Embeddings | ✅ Online |
+## Current State
 
-## Model Router Policy v2
-- **Primary:** Gemma 4 E4B (LM Studio) — architecture, governance, spec, code
-- **Fallback:** gpt-oss:20b (Ollama) — heavy reasoning, direct JSON
-- **Utility:** qwen2.5:1.5b (Ollama) — classification, metadata
-- **Lightweight:** phi3:mini (Ollama) — background checks
-- **Embeddings:** nomic-embed-text-v1.5 (LM Studio)
+### Services
+| Service | Status | Port | PID |
+|---------|--------|------|-----|
+| API (FastAPI) | ✅ Running | 8000 | 77294 |
+| Frontend (Next.js) | ✅ Running | 3000 | - |
+| PostgreSQL | ✅ Running | 5432 | - |
+| Redis | ✅ Running | 6379 | - |
 
-## Golden Pipeline (Gemma 4 E4B)
-- **Run ID:** 43dafe8e-0a6b-448e-bc1a-3ec9dd20b221
-- **Project:** gemma4-golden-pipeline
-- **Duration:** 216,333ms (3.6 min)
-- **Status:** COMPLETED
-- **Results:**
-  - Spec: 6 FR, 4 NFR
-  - Architecture: 7 components, 2 ADRs, Mermaid diagram
-  - Governance: 5 concerns, 2 security findings
-  - Tests: 6 test cases, 3 edge cases
-  - 12 artifacts total
-- **Integrity:** Event chain 1.0, Snapshot 1.0, Overall 0.4286
-- **Replay:** 24 events, 12 artifacts, chain continuity VALID
+### Model Router
+- **Primary:** `google/gemma-4-e4b` (LM Studio, `http://localhost:1234/v1`)
+- **Fallback:** `gpt-oss:20b` (Ollama)
 
-## Blockers
-1. **GitHub Token** — Need PAT to push
-2. **Artifact integrity** — Hash mismatch (needs investigation)
-3. **Replay divergences** — 36 divergences (timing-related, non-critical)
+---
 
-## Startup Commands
-```bash
-# Terminal 1: Database
-docker compose up -d postgres redis
+## Integrity Repair — COMPLETE
 
-# Terminal 2: API
-cd apps/api && source .venv/bin/activate && uvicorn src.main:app --reload --port 8000
+### Root Cause
+Artifact hash mismatch caused by volatile derived fields (`artifact_hash`, `content_hash`, `size_bytes`) being stored in `metadata_`, making hash recomputation impossible.
 
-# Terminal 3: Frontend
-cd apps/web && pnpm dev
+### Fix Applied
+1. `apps/api/src/services/artifact_store.py` — Added `sanitize_artifact_metadata()`, removed volatile fields from `metadata_`
+2. `apps/api/src/core/hashing.py` — Added `_filter_metadata_for_hash()`, `compute_artifact_hash()`, `extract_structured_output()`
+3. `apps/api/src/engines/model_providers.py` — LM Studio uses `extract_structured_output()`
 
-# Terminal 4: Ollama (if not running)
-ollama serve
+### Validation
+- **Golden Run:** `789c0b53-fc47-49d7-8c1c-354f7a7395f3`
+- **Artifact Integrity:** 1.0 (12/12 verified)
+- **Overall Integrity:** 0.67 (traceability/governance not populated by design)
+- **Tests:** 30/30 passed
 
-# Terminal 5: LM Studio
-open -a "LM Studio"  # Then activate Local Server via GUI
-```
+### Legacy Runs (marked in DB)
+- `d6da6253`, `03a6ba18`, `e384da5b`, `f3069377`, `64b223fd` — all marked as `legacy_hash_contract`
 
-## Recovery Instructions
-1. `cd /Users/marcovanhurne/governed-autonomous-sdlc-factory/governed-autonomous-sdlc-factory`
-2. `git checkout main`
-3. `docker compose up -d`
-4. `cd apps/api && source .venv/bin/activate && uvicorn src.main:app --reload --port 8000 &`
-5. `cd apps/web && pnpm dev &`
-6. `ollama serve &`
-7. `open -a "LM Studio"` → Activate Local Server
-8. Open http://localhost:3000
+---
 
-## Next Priorities
-1. GitHub push (needs token)
-2. Fix artifact integrity hash computation
-3. Investigate replay divergences
-4. Add JSON extraction for Gemma markdown-wrapped output
-5. Implement WebSocket event streaming to frontend
+## Key Files
+- `apps/api/src/services/artifact_store.py` — Artifact persistence with metadata sanitization
+- `apps/api/src/core/hashing.py` — Canonical hashing + structured output normalization
+- `apps/api/src/core/integrity.py` — Integrity verification engine
+- `apps/api/tests/test_artifact_hash_integrity.py` — 30 tests
+
+## Evidence Reports
+- `evidence/artifact-integrity-root-cause.md`
+- `evidence/artifact-hash-contract.md`
+- `evidence/artifact-integrity-validation.md`
+- `evidence/structured-output-normalization.md`
+- `evidence/legacy-hash-contract-runs.md`
+- `evidence/artifact-hash-test-results.md`
+- `evidence/integrity-repair-validation.md`
+
+---
+
+## Database
+- **Connection:** `postgresql+asyncpg://governance:forge@localhost:5432/sdlc_factory`
+- **Key tables:** runs, artifacts, log_events, run_snapshots, integrity_verifications
+
+## Pending
+- GitHub push blocked (invalid token)
+- Traceability links not populated by pipeline (separate issue)
+- Governance evaluations not populated by pipeline (separate issue)

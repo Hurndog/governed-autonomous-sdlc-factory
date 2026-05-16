@@ -25,6 +25,72 @@ logger = get_logger("artifact_store")
 # Base directory for artifact storage
 ARTIFACT_BASE_DIR = Path(os.environ.get("ARTIFACT_DIR", "/tmp/cortex-artifacts"))
 
+# Volatile fields that must never appear in artifact metadata.
+# These are either derived integrity values (computed from content) or
+# runtime-specific values that change between executions.
+_VOLATILE_METADATA_FIELDS = frozenset({
+    # Integrity-derived fields
+    "artifact_hash",
+    "content_hash",
+    "size_bytes",
+    # Database identity fields
+    "id",
+    "created_at",
+    "updated_at",
+    # Timestamp fields
+    "timestamp",
+    "started_at",
+    "completed_at",
+    "evaluated_at",
+    "verified_at",
+    "captured_at",
+    # Runtime execution fields
+    "absolute_path",
+    "file_path",
+    "duration_ms",
+    "duration",
+    "retry_count",
+    "retries",
+    "attempt",
+    # Non-deterministic fields
+    "run_id",
+    "project_id",
+    "task_id",
+    "agent_id",
+    "trace_id",
+    "session_id",
+    "replay_session_id",
+})
+
+
+def sanitize_artifact_metadata(metadata: Optional[dict]) -> dict:
+    """Remove volatile/non-deterministic fields from artifact metadata.
+
+    Only stable descriptive metadata is retained:
+    - phase_name, source_engine, parent_artifact_id, subdir
+    - model, spec_id, arch_id, test_plan_id, link_type
+    - Any other user-provided stable string/int/bool values
+
+    Removes:
+    - Derived integrity values (artifact_hash, content_hash, size_bytes)
+    - Database identity fields (id, created_at, updated_at)
+    - Runtime execution fields (timestamps, paths, retry counts)
+    - Non-deterministic references (run_id, task_id, agent_id, trace_id)
+    """
+    if not metadata:
+        return {}
+    clean = {}
+    for k, v in metadata.items():
+        if k in _VOLATILE_METADATA_FIELDS:
+            continue
+        if isinstance(v, (str, int, float, bool, type(None))):
+            clean[k] = v
+        elif isinstance(v, (list, dict)):
+            clean[k] = v
+        else:
+            clean[k] = str(v)
+    return clean
+
 
 class ArtifactStore:
     """Manages artifact persistence across database and filesystem."""
@@ -68,26 +134,26 @@ class ArtifactStore:
 
         # 2. Compute hashes
         content_hash = self._compute_hash(content)
-        
-        # Compute deterministic artifact hash (metadata-based, content-addressable)
-        from src.core.hash_propagation import hash_artifact
-        artifact_hash_input = {
-            "artifact_type": artifact_type,
-            "name": name,
-            "content": content,
+
+        # Build the stable metadata that will be used for BOTH hashing and storage.
+        # This ensures the hash can be recomputed from stored metadata.
+        safe_metadata = sanitize_artifact_metadata({
             "phase_name": phase_name or "",
-            "metadata": {
-                "phase_name": phase_name,
-                "content_hash": content_hash,
-                "size_bytes": len(content),
-                "source_engine": source_engine,
-                "parent_artifact_id": parent_artifact_id,
-                "subdir": subdir,
-                **(metadata or {}),
-            },
-        }
-        from src.core.hashing import compute_hash
-        artifact_hash = compute_hash(artifact_hash_input)
+            "source_engine": source_engine or "",
+            "parent_artifact_id": parent_artifact_id or "",
+            "subdir": subdir or "",
+            **(metadata or {}),
+        })
+
+        # Compute deterministic artifact hash (content-addressable, excludes volatile fields)
+        from src.core.hashing import compute_artifact_hash
+        artifact_hash = compute_artifact_hash(
+            artifact_type=artifact_type,
+            name=name,
+            content=content,
+            phase_name=phase_name or "",
+            metadata=safe_metadata,
+        )
 
         # 3. Persist to database
         async with async_session_factory() as session:
@@ -99,16 +165,7 @@ class ArtifactStore:
                 content=content[:10000],  # Truncate for DB storage
                 file_path=str(file_path),
                 artifact_hash=artifact_hash,
-                metadata_={
-                    "phase_name": phase_name,
-                    "content_hash": content_hash,
-                    "artifact_hash": artifact_hash,
-                    "size_bytes": len(content),
-                    "source_engine": source_engine,
-                    "parent_artifact_id": parent_artifact_id,
-                    "subdir": subdir,
-                    **(metadata or {}),
-                },
+                metadata_=safe_metadata,
             )
             session.add(artifact)
             await session.flush()
@@ -152,9 +209,9 @@ class ArtifactStore:
                 artifact_type=art.get("type", "specification"),
                 phase_name=art.get("phase", ""),
                 subdir=art.get("subdir", ""),
-                metadata=art.get("metadata", {}),
+                metadata=art.get("metadata") or {},
                 source_engine=art.get("source_engine", ""),
-                parent_artifact_id=art.get("parent_artifact_id"),
+                parent_artifact_id=art.get("parent_artifact_id") or "",
             )
             results.append(result)
         return results

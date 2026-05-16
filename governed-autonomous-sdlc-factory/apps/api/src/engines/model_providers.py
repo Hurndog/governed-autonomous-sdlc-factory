@@ -182,6 +182,10 @@ class LMStudioProvider(BaseProvider):
             response_text = message.get("content", "")
             reasoning = message.get("reasoning_content") or message.get("reasoning")
 
+            # Normalize structured output (handle markdown-wrapped JSON)
+            from src.core.hashing import extract_structured_output
+            normalized_response, raw_response = extract_structured_output(response_text)
+
             usage = data.get("usage", {})
             latency = (time.monotonic() - start) * 1000
 
@@ -190,7 +194,7 @@ class LMStudioProvider(BaseProvider):
             return self._build_result(
                 model=model,
                 prompt=prompt_text,
-                response=response_text,
+                response=normalized_response,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 completion_tokens=usage.get("completion_tokens", 0),
                 latency_ms=latency,
