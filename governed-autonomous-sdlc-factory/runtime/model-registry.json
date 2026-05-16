@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-05-14T08:30:00+02:00",
+  "providers": {
+    "ollama": {
+      "endpoint": "http://localhost:11434",
+      "status": "online",
+      "models": [
+        {
+          "name": "gpt-oss:20b",
+          "parameter_size": "20.9B",
+          "quantization": "MXFP4",
+          "size_gb": 13.8,
+          "context_length": 131072,
+          "capabilities": ["code_generation", "architecture_reasoning", "governance_reasoning", "long_form_cognition", "structured_output"],
+          "recommended_roles": ["architecture_reasoning", "code_generation", "governance_reasoning"],
+          "ram_estimate_gb": 14.0,
+          "latency_estimate_ms": 7000,
+          "cost_per_1k_tokens": 0.0
+        },
+        {
+          "name": "qwen2.5:1.5b",
+          "parameter_size": "1.5B",
+          "quantization": "Q4_K_M",
+          "size_gb": 1.0,
+          "context_length": 32768,
+          "capabilities": ["utility_tasks", "classification", "lightweight_inference", "background_cognition"],
+          "recommended_roles": ["utility_tasks", "classification", "embeddings"],
+          "ram_estimate_gb": 1.2,
+          "latency_estimate_ms": 500,
+          "cost_per_1k_tokens": 0.0
+        },
+        {
+          "name": "phi3:mini",
+          "parameter_size": "3.8B",
+          "quantization": "Q4_0",
+          "size_gb": 2.2,
+          "context_length": 4096,
+          "capabilities": ["lightweight_inference", "utility_tasks"],
+          "recommended_roles": ["utility_tasks"],
+          "ram_estimate_gb": 2.5,
+          "latency_estimate_ms": 1000,
+          "cost_per_1k_tokens": 0.0
+        }
+      ]
+    },
+    "lm_studio": {
+      "endpoint": "http://localhost:1234",
+      "status": "server_off",
+      "models": [],
+      "note": "LM Studio app is running (PID 698) but Local Server is not activated. Requires manual GUI interaction to start."
+    },
+    "openai": {
+      "endpoint": "https://api.openai.com/v1",
+      "status": "no_key",
+      "models": []
+    },
+    "anthropic": {
+      "endpoint": "https://api.anthropic.com/v1",
+      "status": "no_key",
+      "models": []
+    }
+  },
+  "routing_policy": {
+    "architecture_reasoning": { "primary": "ollama/gpt-oss:20b", "fallback": "ollama/qwen2.5:1.5b" },
+    "code_generation": { "primary": "ollama/gpt-oss:20b", "fallback": "ollama/qwen2.5:1.5b" },
+    "governance_reasoning": { "primary": "ollama/gpt-oss:20b", "fallback": "ollama/qwen2.5:1.5b" },
+    "specification_generation": { "primary": "ollama/gpt-oss:20b", "fallback": "ollama/qwen2.5:1.5b" },
+    "test_generation": { "primary": "ollama/gpt-oss:20b", "fallback": "ollama/qwen2.5:1.5b" },
+    "utility_tasks": { "primary": "ollama/qwen2.5:1.5b", "fallback": "ollama/phi3:mini" },
+    "classification": { "primary": "ollama/qwen2.5:1.5b", "fallback": "ollama/phi3:mini" },
+    "embeddings": { "primary": "ollama/qwen2.5:1.5b", "fallback": null },
+    "background_cognition": { "primary": "ollama/phi3:mini", "fallback": null }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-05-14T08:30:00+02:00",
+  "benchmarks": [
+    {
+      "model": "ollama/gpt-oss:20b",
+      "test": "basic_inference",
+      "prompt": "Say hello in exactly 5 words",
+      "response": "Hello, how's your day going?",
+      "tokens": 364,
+      "duration_seconds": 6.9,
+      "tokens_per_second": 52.8,
+      "success": true
+    },
+    {
+      "model": "ollama/gpt-oss:20b",
+      "test": "specification_generation",
+      "prompt": "Generate a specification for a task management REST API",
+      "response_summary": "7 functional requirements, 3 non-functional, 7 acceptance criteria, 2 governance areas",
+      "tokens": 2344,
+      "duration_seconds": 42.0,
+      "tokens_per_second": 55.8,
+      "success": true
+    },
+    {
+      "model": "ollama/qwen2.5:1.5b",
+      "test": "basic_inference",
+      "prompt": "Say hello in exactly 5 words",
+      "response": "Hello there, how are you?",
+      "tokens": 120,
+      "duration_seconds": 1.2,
+      "tokens_per_second": 100.0,
+      "success": true
+    },
+    {
+      "model": "ollama/phi3:mini",
+      "test": "basic_inference",
+      "prompt": "Say hello in exactly 5 words",
+      "response": "Hello, nice to meet you!",
+      "tokens": 85,
+      "duration_seconds": 0.8,
+      "tokens_per_second": 106.3,
+      "success": true
+    }
+  ],
+  "summary": {
+    "best_coding_model": "ollama/gpt-oss:20b",
+    "best_architecture_model": "ollama/gpt-oss:20b",
+    "best_governance_model": "ollama/gpt-oss:20b",
+    "best_utility_model": "ollama/qwen2.5:1.5b",
+    "fastest_model": "ollama/phi3:mini",
+    "most_capable_model": "ollama/gpt-oss:20b",
+    "total_models_benchmarked": 3,
+    "all_local": true,
+    "total_cost": 0.0
+  }
+}
