@@ -55,9 +55,7 @@ class Settings(BaseSettings):
     def anthropic_configured(self) -> bool:
         return bool(self.anthropic_api_key)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "allow"}
 
 
 settings = Settings()

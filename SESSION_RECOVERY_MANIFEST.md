@@ -1,59 +1,48 @@
 # SESSION_RECOVERY_MANIFEST.md
 
-**Last Updated:** 2026-05-15T19:30:00+00:00
-**Commit:** 3852c47
+**Last Updated:** 2026-05-16T15:48:00+00:00
+**Commit:** f6dd264
+**Tag:** v0.1.0-golden-integrity-runtime
 **Branch:** main
 
 ## Repository
 
 - **Path:** `/Users/marcovanhurne/governed-autonomous-sdlc-factory`
 - **Branch:** main
-- **Commits:** 5 (3852c47, 8b82c1a, 2016f4b, 1a26ef7, 02d7486)
-- **Remote:** NOT CONFIGURED (needs GITHUB_TOKEN)
+- **HEAD:** f6dd264 (Harden integrity verification API with sync runtime)
+- **Remote:** NOT CONFIGURED (GITHUB_TOKEN invalid)
 - **Git User:** Hurndog <150154045+Hurndog@users.noreply.github.com>
+- **Working tree:** Clean
 
 ## Runtime Ports
 
 | Port | Service | Status |
 |------|---------|--------|
-| 5432 | Postgres (Docker) | ✅ healthy |
-| 6379 | Redis (Docker) | ✅ healthy |
-| 6333 | Qdrant (Docker) | ⚠️ unhealthy |
-| 11434 | Ollama | ✅ running |
-| 1234 | LM Studio | ❌ server disabled |
-| 8000 | API (FastAPI) | ✅ starts successfully (114 routes) |
-| 3000 | Frontend (Next.js) | ❌ not started |
+| 5432 | PostgreSQL | ✅ connected (via API health) |
+| 6379 | Redis | ✅ connected (via API health) |
+| 6333 | Qdrant | Configured |
+| 11434 | Ollama | ✅ running (3 models) |
+| 1234 | LM Studio | ✅ running (2 models) |
+| 8000 | API (FastAPI) | ✅ running (health ok) |
 
 ## Infrastructure
 
-- **Docker:** 29.4.3 — running
-- **Python:** 3.11.15 (hermes-agent venv)
+- **Python:** 3.11.15 (venv at `governed-autonomous-sdlc-factory/apps/api/venv`)
 - **Node:** 22.22.2
 - **pnpm:** 11.0.9
 - **Git:** 2.50.1
 - **Ollama:** 0.23.4 — running with 3 models
-- **LM Studio:** installed, server disabled
+- **LM Studio:** running with 2 models
+- **psycopg2-binary:** installed (for sync database access)
 
-## Ollama Models
+## Model Providers
 
-| Model | Size | Context | Reasoning | Priority |
-|-------|------|---------|-----------|----------|
-| gpt-oss:20b | 13.8GB | 131072 | ✅ | 100 |
-| qwen2.5:1.5b | 1.0GB | 32768 | ✅ | 50 |
-| phi3:mini | 2.2GB | 4096 | ❌ | 25 |
-
-## Model Router
-
-- **Default Provider:** ollama
-- **Default Model:** gpt-oss:20b
-- **Fallback Chain:** ollama:gpt-oss:20b → ollama:qwen2.5:1.5b → lm_studio:local-model → openai:gpt-4o-mini → anthropic:claude-3-5-sonnet
-- **Task Routing:**
-  - architecture_reasoning → ollama:gpt-oss:20b
-  - governance_reasoning → ollama:gpt-oss:20b
-  - code_generation → ollama:gpt-oss:20b
-  - specification_generation → ollama:gpt-oss:20b
-  - test_generation → ollama:gpt-oss:20b
-  - utility_tasks → ollama:qwen2.5:1.5b
+| Provider | Base URL | Model | Status |
+|----------|----------|-------|--------|
+| LM Studio | http://localhost:1234/v1 | local-model | ✅ running |
+| Ollama | http://localhost:11434 | gpt-oss:20b, qwen2.5:1.5b, phi3:mini | ✅ running |
+| Anthropic | — | — | Configured via env |
+| OpenAI | — | — | Configured via env |
 
 ## API Keys Status
 
@@ -61,66 +50,94 @@
 |-----|--------|
 | OPENAI_API_KEY | ❌ NOT SET |
 | ANTHROPIC_API_KEY | ❌ NOT SET |
-| GITHUB_TOKEN | ❌ NOT SET |
-| MEM0_API_KEY | ✅ present |
-| TWILIO_AUTH_TOKEN | ✅ present |
+| GITHUB_TOKEN | ❌ INVALID (401 Unauthorized) |
+
+## Golden Run
+
+- **Run ID:** `6a7f7ea0-297f-435e-9bb2-899368c7d332`
+- **Integrity:** 1.0 (all 6 components pass)
+- **Events:** 239
+- **Artifacts:** 12 (all hash-verified)
+- **Traceability Links:** 215
+- **Governance Evaluations:** 10
+- **Release Gates:** 1
+- **Tests:** 44/44 passing
+
+## Commit Chain (latest 10)
+
+```
+f6dd264 Harden integrity verification API with sync runtime
+6888ef9 Add traceability and governance persistence to golden pipeline
+98299bb Fix artifact metadata sanitization and validate integrity repair
+62635da docs: GitHub sync status — token invalid
+63e3b64 feat(gemma4): Gemma 4 E4B primary model + golden pipeline + routing policy v2
+6355969 feat(runtime): Full autonomous pipeline validation + model benchmarks + backup
+fd462fc docs: SESSION_RECOVERY_MANIFEST — full runtime state + recovery instructions
+24ef63a feat(ops): GitHub setup script + environment reports
+21648a0 feat(frontend): Cognitive Command Center — 5 rooms + WebSocket + dark ops UI
+8a86dc1 feat(operationalization): Ollama integration + startup diagnostics + golden baseline
+```
+
+## Key Files
+
+| File | Description |
+|------|-------------|
+| `governed-autonomous-sdlc-factory/apps/api/src/services/full_pipeline_orchestrator.py` | Pipeline lifecycle with integrity persistence |
+| `governed-autonomous-sdlc-factory/apps/api/src/services/artifact_store.py` | Sanitized artifact storage |
+| `governed-autonomous-sdlc-factory/apps/api/src/core/hashing.py` | Deterministic SHA256 hashing |
+| `governed-autonomous-sdlc-factory/apps/api/src/core/config.py` | Pydantic settings (v2 compatible) |
+| `governed-autonomous-sdlc-factory/apps/api/src/engines/integrity_runtime_sync.py` | Sync integrity verification runtime |
+| `governed-autonomous-sdlc-factory/apps/api/tests/test_artifact_hash_integrity.py` | 44 integrity tests |
 
 ## Startup Commands
 
 ```bash
-# Start infrastructure
-cd /Users/marcovanhurne/governed-autonomous-sdlc-factory
-docker compose up -d postgres redis qdrant
-
 # Start API
-cd governed-autonomous-sdlc-factory/apps/api
-/Users/marcovanhurne/.hermes/hermes-agent/venv/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+cd /Users/marcovanhurne/governed-autonomous-sdlc-factory/governed-autonomous-sdlc-factory/apps/api
+source venv/bin/activate
+uvicorn src.main:app --host 0.0.0.0 --port 8000
 
-# Start frontend (when ready)
-cd apps/web
-pnpm install && pnpm dev
+# Verify
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/api/v1/pipeline/runs/6a7f7ea0-297f-435e-9bb2-899368c7d332/verify-integrity
 ```
 
 ## Recovery Instructions
 
 1. **Repository:** Already on disk at `/Users/marcovanhurne/governed-autonomous-sdlc-factory`
-2. **Database:** `docker compose up -d postgres` — data persisted in Docker volume
-3. **Ollama models:** Already downloaded, will be auto-detected
-4. **API keys:** Need to be set in `.env` file for OpenAI/Anthropic
-5. **GitHub:** Run `scripts/github-setup.sh` after setting GITHUB_TOKEN
+2. **Database:** PostgreSQL running locally, data persisted
+3. **Models:** Ollama + LM Studio running, models auto-detected
+4. **API keys:** Set in `.env` file
+5. **GitHub:** Run `scripts/github-setup.sh` after setting valid GITHUB_TOKEN
+6. **Backup:** Latest at `backups/20260516_154820/`
 
 ## Blockers
 
-1. **GitHub remote not configured** — needs GITHUB_TOKEN
-2. **LM Studio server disabled** — needs GUI interaction to enable
-3. **No OpenAI/Anthropic API keys** — remote LLM inference unavailable
-4. **Frontend not built** — only package.json exists
-5. **Qdrant unhealthy** — memory service may not work
+1. **GitHub remote not configured** — GITHUB_TOKEN invalid (401)
+2. **No OpenAI/Anthropic API keys** — remote LLM inference unavailable
+3. **Pydantic v2 Config** — Fixed with `model_config` + `extra="allow"`
 
 ## Next Priorities
 
-1. Configure GitHub remote (needs token from user)
-2. Test cognitive endpoints with Ollama
-3. Execute golden baseline run
-4. Build frontend foundation
-5. Enable LM Studio server (needs GUI)
+1. Configure GitHub remote (needs valid PAT from user)
+2. Build frontend (Cognitive Command Center)
+3. Autonomous code generation with real LLM inference
+4. Expand test coverage beyond integrity suite
 
 ## Backup
 
 - **Script:** `scripts/backup.sh`
 - **Location:** `backups/YYYYMMDD_HHMMSS/`
-- **Last Backup:** 20260515_193124 (2.4M)
-- **Contains:** git bundle, database dump, evidence, runtime manifests, config files
+- **Last Backup:** 20260516_154820 (5.7MB, 22 files)
+- **Contains:** git bundle, database dump (JSON), evidence (16 files), runtime manifests, config files, checksums
+- **Backup SHA256:** `494bbce34840f91dd7b3f874882855e25983bddd7c040f0269f5f5b1e119058a` (repo.bundle)
 
-## Cognitive Execution Status
+## Operational Status
 
-- **Replay Runtime:** ✅ operational (integrity score 1.0)
-- **Integrity System:** ✅ operational
-- **Model Router:** ✅ operational (Ollama integrated)
-- **Specification Engine:** ✅ code complete
-- **Architecture Engine:** ✅ code complete
-- **Test Plan Engine:** ✅ code complete
-- **Governance Engine:** ✅ code complete
-- **Pipeline Orchestrator:** ✅ rewritten with real AI engines
-- **Cognitive API Endpoints:** ✅ 5 endpoints at `/api/v1/cognitive/`
-- **Total Routes:** 114
+- **Integrity System:** ✅ API-verified, all components 1.0
+- **Sync Runtime:** ✅ `integrity_runtime_sync.py` operational
+- **Replay Runtime:** ✅ operational
+- **Model Router:** ✅ operational
+- **Pipeline Orchestrator:** ✅ operational with full traceability
+- **Test Suite:** ✅ 44/44 passing
+- **API:** ✅ healthy, all endpoints functional
