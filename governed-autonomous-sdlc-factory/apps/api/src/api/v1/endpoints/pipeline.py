@@ -172,33 +172,50 @@ from src.models import (
 @router.get("/runs/{run_id}/integrity")
 async def get_run_integrity(
     run_id: str,
-    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Get integrity verification for a run."""
-    integrity_mgr = IntegrityManager(run_id)
-    report = await integrity_mgr.verify_all(db)
-    return report.to_dict()
+    import asyncio
+    from src.engines.integrity_runtime_sync import verify_integrity_sync
+
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None,  # Uses default executor
+        verify_integrity_sync,
+        run_id,
+    )
+    return result
 
 
 @router.post("/runs/{run_id}/verify-integrity")
 async def verify_run_integrity(
     run_id: str,
-    db: AsyncSession = Depends(get_db_no_autoflush),
     user=Depends(get_current_user),
 ):
     """Run full integrity verification on a run."""
-    integrity_mgr = IntegrityManager(run_id)
-    report = await integrity_mgr.verify_all(db)
+    import asyncio
+    from src.engines.integrity_runtime_sync import verify_integrity_sync
+
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None,  # Uses default executor
+        verify_integrity_sync,
+        run_id,
+    )
+
     return {
         "run_id": run_id,
-        "integrity_score": report.overall_score,
-        "status": "pass" if report.overall_score >= 0.8 else "warning" if report.overall_score >= 0.5 else "fail",
-        "checks": report.total_checks,
-        "passed": report.passed_checks,
-        "failed": report.failed_checks,
-        "warnings": report.warning_checks,
-        "report": report.to_dict(),
+        "integrity_score": result.get("overall_score", 0.0),
+        "status": (
+            "pass" if result.get("overall_score", 0) >= 0.8
+            else "warning" if result.get("overall_score", 0) >= 0.5
+            else "fail"
+        ),
+        "checks": result.get("total_checks", 0),
+        "passed": result.get("passed_checks", 0),
+        "failed": result.get("failed_checks", 0),
+        "warnings": result.get("warning_checks", 0),
+        "report": result,
     }
 
 

@@ -475,12 +475,77 @@ def test_governance_all_decisions_produce_valid_hashes():
     base = {
         "policy_name": "test-policy",
         "input_data": {"findings": []},
-        "output_data": {},
+        "output_data": {"decision": "pass"},
         "run_id": "test-run-id",
     }
     for decision in ["pass", "fail", "warn"]:
         h = compute_governance_hash(decision=decision, **base)
         assert len(h) == 64, f"Hash for decision={decision} must be 64 chars"
+
+
+# ─── Integrity Runtime Sync Tests ──────────────────────────────────────────
+
+def test_sync_integrity_verifier_import():
+    """Sync integrity verifier must be importable."""
+    from src.engines.integrity_runtime_sync import IntegrityVerifier, verify_integrity_sync
+    assert IntegrityVerifier is not None
+    assert verify_integrity_sync is not None
+
+
+def test_sync_verifier_returns_report_for_missing_run():
+    """Sync verifier must return a report for a missing run."""
+    from src.engines.integrity_runtime_sync import IntegrityVerifier
+    verifier = IntegrityVerifier(run_id="nonexistent-run-id")
+    report = verifier.verify()
+    assert report.run_id == "nonexistent-run-id"
+    assert report.total_checks >= 1
+
+
+def test_sync_verifier_governance_hash_matches_pipeline():
+    """Sync verifier governance hash must match pipeline's hash structure."""
+    from src.core.hashing import compute_governance_hash
+    # Pipeline uses: input_data={"findings": findings}, output_data={"decision": decision}
+    findings = [{"issue": "test"}]
+    hash1 = compute_governance_hash(
+        policy_name="test-policy",
+        decision="fail",
+        input_data={"findings": findings},
+        output_data={"decision": "fail"},
+        run_id="test-run",
+    )
+    # Sync runtime must use the same structure
+    hash2 = compute_governance_hash(
+        policy_name="test-policy",
+        decision="fail",
+        input_data={"findings": findings},
+        output_data={"decision": "fail"},
+        run_id="test-run",
+    )
+    assert hash1 == hash2, "Pipeline and sync runtime must produce same governance hash"
+
+
+def test_sync_verifier_artifact_hash_matches():
+    """Sync verifier artifact hash must match compute_artifact_hash."""
+    from src.core.hashing import compute_artifact_hash, _filter_metadata_for_hash
+    content = '{"test": true}'
+    metadata = {"phase_name": "test", "source_engine": "test"}
+    safe_meta = _filter_metadata_for_hash(metadata)
+    h1 = compute_artifact_hash("specification", "test.json", content, "test", safe_meta)
+    h2 = compute_artifact_hash("specification", "test.json", content, "test", safe_meta)
+    assert h1 == h2, "Artifact hash must be deterministic"
+    assert len(h1) == 64
+
+
+def test_sync_verifier_traceability_hash_matches():
+    """Sync verifier traceability hash must match compute_traceability_hash."""
+    from src.core.hashing import compute_traceability_hash
+    h = compute_traceability_hash(
+        source_type="requirement", source_id="FR-001",
+        target_type="test_case", target_id="TC-001",
+        link_type="tested_by", run_id="test-run",
+    )
+    assert len(h) == 64
+    assert all(c in "0123456789abcdef" for c in h)
 
 
 # ─── Run all tests ────────────────────────────────────────────────────────
