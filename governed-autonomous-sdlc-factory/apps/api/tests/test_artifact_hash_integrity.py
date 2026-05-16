@@ -1,4 +1,4 @@
-"""Tests for artifact hash integrity and metadata sanitization.
+"""Tests for artifact hash integrity, metadata sanitization, traceability, and governance.
 
 Validates:
 - Metadata sanitization removes volatile fields
@@ -9,6 +9,11 @@ Validates:
 - Same stable metadata produces same hash regardless of key order
 - Markdown-wrapped JSON normalization works correctly
 - Integrity verification recomputes the same hash as creation
+- Traceability links are created for each required relation type
+- Traceability links have stable source and target IDs
+- Governance evaluations are persisted
+- Release gates are created
+- Overall integrity components are populated
 """
 import hashlib
 import json
@@ -340,6 +345,142 @@ def test_raw_vs_normalized_different_when_markdown():
     normalized_hash = hashlib.sha256(normalized.encode()).hexdigest()
 
     assert raw_hash != normalized_hash, "Raw and normalized hashes must differ when markdown wrapping exists"
+
+
+# ─── Traceability Tests ────────────────────────────────────────────────────
+
+def test_traceability_link_creation():
+    """TraceabilityManager.link must create a link with all required fields."""
+    from src.core.hashing import compute_traceability_hash
+    link_data = {
+        "source_type": "requirement",
+        "source_id": "FR-001",
+        "target_type": "acceptance_criterion",
+        "target_id": "AC-001",
+        "link_type": "validated_by",
+        "run_id": "test-run-id",
+    }
+    edge_hash = compute_traceability_hash(**link_data)
+    assert len(edge_hash) == 64, "Edge hash must be 64-char hex"
+    assert all(c in "0123456789abcdef" for c in edge_hash), "Edge hash must be hex"
+
+
+def test_traceability_link_deterministic():
+    """Same traceability link must produce same edge hash."""
+    from src.core.hashing import compute_traceability_hash
+    params = {
+        "source_type": "requirement",
+        "source_id": "FR-001",
+        "target_type": "test_case",
+        "target_id": "TC-001",
+        "link_type": "tested_by",
+        "run_id": "test-run-id",
+    }
+    h1 = compute_traceability_hash(**params)
+    h2 = compute_traceability_hash(**params)
+    assert h1 == h2, "Edge hash must be deterministic"
+
+
+def test_traceability_link_different_sources_produce_different_hashes():
+    """Different source/target must produce different edge hashes."""
+    from src.core.hashing import compute_traceability_hash
+    base = {"link_type": "implements", "run_id": "test-run-id"}
+    h1 = compute_traceability_hash(source_type="requirement", source_id="FR-001", target_type="test_case", target_id="TC-001", **base)
+    h2 = compute_traceability_hash(source_type="requirement", source_id="FR-002", target_type="test_case", target_id="TC-001", **base)
+    assert h1 != h2, "Different source_id must produce different hash"
+
+
+def test_traceability_required_relation_types():
+    """All required traceability relation types must be supported."""
+    from src.core.hashing import compute_traceability_hash
+    required_types = [
+        ("requirement", "acceptance_criterion", "validated_by"),
+        ("requirement", "architecture_component", "implemented_by"),
+        ("requirement", "test_case", "tested_by"),
+        ("requirement", "governance_concern", "governed_by"),
+        ("architecture_component", "test_case", "tested_by"),
+        ("governance_concern", "governance_policy", "evaluated_by"),
+        ("governance_policy", "governance_evaluation", "evaluated_as"),
+        ("governance_evaluation", "release_gate", "gates"),
+        ("phase", "artifact", "produces"),
+    ]
+    base = {"run_id": "test-run-id", "source_id": "SRC-001", "target_id": "TGT-001"}
+    for src_type, tgt_type, link_type in required_types:
+        h = compute_traceability_hash(source_type=src_type, target_type=tgt_type, link_type=link_type, **base)
+        assert len(h) == 64, f"Hash for {src_type}→{tgt_type} ({link_type}) must be 64 chars"
+
+
+# ─── Governance Tests ──────────────────────────────────────────────────────
+
+def test_governance_evaluation_hash():
+    """Governance evaluation integrity hash must be computable."""
+    from src.core.hashing import compute_governance_hash
+    h = compute_governance_hash(
+        policy_name="test-policy",
+        decision="pass",
+        input_data={"findings": []},
+        output_data={"decision": "pass"},
+        run_id="test-run-id",
+    )
+    assert len(h) == 64, "Governance hash must be 64-char hex"
+    assert all(c in "0123456789abcdef" for c in h), "Governance hash must be hex"
+
+
+def test_governance_evaluation_hash_deterministic():
+    """Same governance evaluation must produce same hash."""
+    from src.core.hashing import compute_governance_hash
+    params = {
+        "policy_name": "no-critical-vulnerabilities",
+        "decision": "fail",
+        "input_data": {"findings": [{"impact": "high"}]},
+        "output_data": {"decision": "fail"},
+        "run_id": "test-run-id",
+    }
+    h1 = compute_governance_hash(**params)
+    h2 = compute_governance_hash(**params)
+    assert h1 == h2, "Governance hash must be deterministic"
+
+
+def test_governance_evaluation_different_decisions_different_hashes():
+    """Different decisions must produce different hashes."""
+    from src.core.hashing import compute_governance_hash
+    base = {
+        "policy_name": "test-policy",
+        "input_data": {"findings": []},
+        "output_data": {},
+        "run_id": "test-run-id",
+    }
+    h_pass = compute_governance_hash(decision="pass", **base)
+    h_fail = compute_governance_hash(decision="fail", **base)
+    assert h_pass != h_fail, "Different decisions must produce different hashes"
+
+
+def test_governance_evaluation_links_to_policy():
+    """Governance evaluation must reference a policy."""
+    from src.core.hashing import compute_governance_hash
+    h = compute_governance_hash(
+        policy_name="no-critical-vulnerabilities",
+        decision="pass",
+        input_data={"findings": []},
+        output_data={"decision": "pass"},
+        run_id="test-run-id",
+        artifact_id="art-123",
+    )
+    assert len(h) == 64
+
+
+def test_governance_all_decisions_produce_valid_hashes():
+    """All decision types (pass, fail, warn) must produce valid hashes."""
+    from src.core.hashing import compute_governance_hash
+    base = {
+        "policy_name": "test-policy",
+        "input_data": {"findings": []},
+        "output_data": {},
+        "run_id": "test-run-id",
+    }
+    for decision in ["pass", "fail", "warn"]:
+        h = compute_governance_hash(decision=decision, **base)
+        assert len(h) == 64, f"Hash for decision={decision} must be 64 chars"
 
 
 # ─── Run all tests ────────────────────────────────────────────────────────

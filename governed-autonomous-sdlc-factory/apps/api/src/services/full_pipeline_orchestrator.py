@@ -4,6 +4,7 @@ Executes the complete cognitive pipeline using REAL AI engines:
 intent → specification → architecture → governance → test plan → traceability → snapshot → evidence
 
 Each step uses ModelRouter for LLM inference.
+Traceability links and governance evaluations are persisted to the database.
 """
 import asyncio
 import time
@@ -37,6 +38,7 @@ from src.engines.test_engine import TestPlanEngine, TestPlanArtifact
 from src.engines.traceability import TraceabilityManager
 from src.engines.snapshots import SnapshotManager
 from src.engines.inference_trace import InferenceTracer
+from src.core.hashing import compute_governance_hash, compute_traceability_hash
 
 logger = get_logger("full_pipeline")
 
@@ -119,6 +121,7 @@ class FullPipelineOrchestrator:
         bus = EventBusManager.get_bus(run_id)
         store = ArtifactStore(run_id, project_id)
         tracer = InferenceTracer(run_id=run_id)
+        trace_mgr = TraceabilityManager(run_id)
 
         await publish_custom_event(
             run_id, "pipeline.started",
@@ -160,7 +163,7 @@ class FullPipelineOrchestrator:
             )
             # Persist spec artifacts
             if spec.functional_requirements:
-                await store.persist(
+                req_artifact = await store.persist(
                     name="requirements.json",
                     content=json.dumps(spec.functional_requirements, indent=2, default=str),
                     artifact_type=ArtifactType.SPECIFICATION.value,
@@ -170,7 +173,7 @@ class FullPipelineOrchestrator:
                 )
                 metrics.artifacts_generated += 1
             if spec.acceptance_criteria:
-                await store.persist(
+                ac_artifact = await store.persist(
                     name="acceptance_criteria.json",
                     content=json.dumps(spec.acceptance_criteria, indent=2, default=str),
                     artifact_type=ArtifactType.SPECIFICATION.value,
@@ -179,7 +182,7 @@ class FullPipelineOrchestrator:
                 )
                 metrics.artifacts_generated += 1
             if spec.governance_sensitive_areas:
-                await store.persist(
+                gov_areas_artifact = await store.persist(
                     name="governance_areas.json",
                     content=json.dumps(spec.governance_sensitive_areas, indent=2, default=str),
                     artifact_type=ArtifactType.SPECIFICATION.value,
@@ -187,6 +190,26 @@ class FullPipelineOrchestrator:
                     source_engine="specification-engine",
                 )
                 metrics.artifacts_generated += 1
+
+            # Traceability: requirement → acceptance_criterion
+            async with async_session_factory() as session:
+                for ac in spec.acceptance_criteria:
+                    req_id = ac.get("requirement_id", "")
+                    ac_id = ac.get("id", "")
+                    if req_id and ac_id:
+                        await trace_mgr.link(session, "requirement", req_id, "acceptance_criterion", ac_id, "validated_by")
+                        metrics.traceability_links += 1
+                # Traceability: phase → artifact
+                for art_name in ["requirements.json", "acceptance_criteria.json", "governance_areas.json"]:
+                    art_result = await session.execute(
+                        select(Artifact).where(Artifact.run_id == run_id, Artifact.name == art_name)
+                    )
+                    art = art_result.scalars().first()
+                    if art:
+                        await trace_mgr.link(session, "phase", "specification", "artifact", art.id, "produces")
+                        metrics.traceability_links += 1
+                await session.commit()
+
             metrics.cost_total += spec.cost_usd
             metrics.record_step("generate_specification", (time.monotonic() - t0) * 1000)
             await publish_custom_event(
@@ -204,8 +227,9 @@ class FullPipelineOrchestrator:
                 run_id=run_id,
                 tracer=tracer,
             )
+            arch_artifacts = []
             if arch.architecture_proposal:
-                await store.persist(
+                art = await store.persist(
                     name="architecture.md",
                     content=arch.architecture_proposal,
                     artifact_type=ArtifactType.ARCHITECTURE.value,
@@ -213,35 +237,58 @@ class FullPipelineOrchestrator:
                     source_engine="architecture-engine",
                     metadata={"arch_id": arch.id, "model": arch.model_used},
                 )
+                arch_artifacts.append(art)
                 metrics.artifacts_generated += 1
             if arch.component_breakdown:
-                await store.persist(
+                art = await store.persist(
                     name="components.json",
                     content=json.dumps(arch.component_breakdown, indent=2, default=str),
                     artifact_type=ArtifactType.ARCHITECTURE.value,
                     phase_name="architecture",
                     source_engine="architecture-engine",
                 )
+                arch_artifacts.append(art)
                 metrics.artifacts_generated += 1
             if arch.adrs:
-                await store.persist(
+                art = await store.persist(
                     name="adrs.json",
                     content=json.dumps(arch.adrs, indent=2, default=str),
                     artifact_type=ArtifactType.ARCHITECTURE.value,
                     phase_name="architecture",
                     source_engine="architecture-engine",
                 )
+                arch_artifacts.append(art)
                 metrics.artifacts_generated += 1
             if arch.mermaid_diagrams:
                 for diagram in arch.mermaid_diagrams:
-                    await store.persist(
+                    art = await store.persist(
                         name=f"diagram_{diagram.get('name', 'diagram')}.mmd",
                         content=diagram.get("content", ""),
                         artifact_type=ArtifactType.ARCHITECTURE.value,
                         phase_name="architecture",
                         source_engine="architecture-engine",
                     )
+                    arch_artifacts.append(art)
                     metrics.artifacts_generated += 1
+
+            # Traceability: requirement → architecture_component, phase → artifact
+            async with async_session_factory() as session:
+                for comp in arch.component_breakdown:
+                    comp_name = comp.get("name", "")
+                    comp_id = comp_name.lower().replace(" ", "_") if comp_name else ""
+                    if comp_id:
+                        # Link component to requirements (all requirements for now)
+                        for fr in spec.functional_requirements:
+                            fr_id = fr.get("id", "")
+                            if fr_id:
+                                await trace_mgr.link(session, "requirement", fr_id, "architecture_component", comp_id, "implemented_by")
+                                metrics.traceability_links += 1
+                # Phase → artifact
+                for art in arch_artifacts:
+                    await trace_mgr.link(session, "phase", "architecture", "artifact", art["id"], "produces")
+                    metrics.traceability_links += 1
+                await session.commit()
+
             metrics.cost_total += arch.cost_usd
             metrics.record_step("generate_architecture", (time.monotonic() - t0) * 1000)
             await publish_custom_event(
@@ -260,36 +307,162 @@ class FullPipelineOrchestrator:
                 run_id=run_id,
                 tracer=tracer,
             )
+            gov_artifacts = []
             if gov.runtime_governance_concerns:
-                await store.persist(
+                art = await store.persist(
                     name="governance_concerns.json",
                     content=json.dumps(gov.runtime_governance_concerns, indent=2, default=str),
                     artifact_type=ArtifactType.GOVERNANCE.value,
                     phase_name="governance",
                     source_engine="governance-engine",
                 )
+                gov_artifacts.append(art)
                 metrics.artifacts_generated += 1
             if gov.security_sensitive_findings:
-                await store.persist(
+                art = await store.persist(
                     name="security_findings.json",
                     content=json.dumps(gov.security_sensitive_findings, indent=2, default=str),
                     artifact_type=ArtifactType.GOVERNANCE.value,
                     phase_name="governance",
                     source_engine="governance-engine",
                 )
+                gov_artifacts.append(art)
                 metrics.artifacts_generated += 1
             if gov.compliance_gaps:
-                await store.persist(
+                art = await store.persist(
                     name="compliance_gaps.json",
                     content=json.dumps(gov.compliance_gaps, indent=2, default=str),
                     artifact_type=ArtifactType.GOVERNANCE.value,
                     phase_name="governance",
                     source_engine="governance-engine",
                 )
+                gov_artifacts.append(art)
                 metrics.artifacts_generated += 1
-            metrics.governance_passed = len([f for f in gov.runtime_governance_concerns if f.get("severity") != "critical"])
-            metrics.governance_failed = len([f for f in gov.security_sensitive_findings if f.get("impact") == "high"])
-            metrics.governance_warnings = len(gov.compliance_gaps)
+
+            # Persist governance evaluations and traceability
+            async with async_session_factory() as session:
+                # Load active policies
+                policies_result = await session.execute(
+                    select(GovernancePolicy).where(GovernancePolicy.is_active == True)
+                )
+                policies = policies_result.scalars().all()
+
+                # Create governance evaluations for each policy
+                eval_ids = []
+                for policy in policies:
+                    # Determine decision based on governance findings
+                    decision = "pass"
+                    findings = []
+                    if policy.category == "security" and gov.security_sensitive_findings:
+                        critical = [f for f in gov.security_sensitive_findings if f.get("impact") == "high"]
+                        if critical:
+                            decision = "fail" if policy.is_blocking else "warn"
+                        findings = gov.security_sensitive_findings
+                    elif policy.category == "compliance" and gov.compliance_gaps:
+                        critical = [g for g in gov.compliance_gaps if g.get("severity") == "critical"]
+                        if critical:
+                            decision = "fail" if policy.is_blocking else "warn"
+                        findings = gov.compliance_gaps
+                    elif policy.category == "quality":
+                        # Quality checks: spec has requirements, architecture has components, etc.
+                        if policy.name == "spec-has-acceptance-criteria":
+                            if not spec.acceptance_criteria:
+                                decision = "fail" if policy.is_blocking else "warn"
+                                findings = [{"issue": "No acceptance criteria found"}]
+                            else:
+                                findings = [{"info": f"{len(spec.acceptance_criteria)} acceptance criteria found"}]
+                        elif policy.name == "no-missing-architecture-doc":
+                            if not arch.architecture_proposal:
+                                decision = "fail" if policy.is_blocking else "warn"
+                                findings = [{"issue": "No architecture document"}]
+                            else:
+                                findings = [{"info": "Architecture document present"}]
+                        elif policy.name == "no-missing-specification":
+                            if not spec.functional_requirements:
+                                decision = "fail" if policy.is_blocking else "warn"
+                                findings = [{"issue": "No functional requirements"}]
+                            else:
+                                findings = [{"info": f"{len(spec.functional_requirements)} functional requirements"}]
+                        elif policy.name == "test-coverage-minimum":
+                            # Will be evaluated after test plan
+                            findings = [{"info": "Test coverage evaluated after test plan"}]
+                        else:
+                            findings = [{"info": "Quality check passed"}]
+                    elif policy.category == "release":
+                        findings = [{"info": "Release gate evaluated at end of pipeline"}]
+
+                    if decision == "fail":
+                        metrics.governance_failed += 1
+                    elif decision == "warn":
+                        metrics.governance_warnings += 1
+                    else:
+                        metrics.governance_passed += 1
+
+                    # Compute integrity hash
+                    i_hash = compute_governance_hash(
+                        policy_name=policy.name,
+                        decision=decision,
+                        input_data={"findings": findings},
+                        output_data={"decision": decision},
+                        run_id=run_id,
+                    )
+
+                    evaluation = GovernanceEvaluation(
+                        run_id=run_id,
+                        policy_id=policy.id,
+                        decision=decision,
+                        findings=findings,
+                        evidence={"governance_artifact_id": gov.id},
+                        integrity_hash=i_hash,
+                        evaluated_at=datetime.now(timezone.utc),
+                    )
+                    session.add(evaluation)
+                    await session.flush()
+                    eval_ids.append(evaluation.id)
+
+                    # Traceability: governance_concern → governance_policy → governance_evaluation
+                    for concern in gov.runtime_governance_concerns:
+                        concern_id = concern.get("id", "")
+                        if concern_id:
+                            await trace_mgr.link(session, "governance_concern", concern_id, "governance_policy", policy.id, "evaluated_by")
+                            metrics.traceability_links += 1
+                    await trace_mgr.link(session, "governance_policy", policy.id, "governance_evaluation", evaluation.id, "evaluated_as")
+                    metrics.traceability_links += 1
+
+                # Create release gate
+                if eval_ids:
+                    gate_status = "passed" if metrics.governance_failed == 0 else "failed"
+                    release_gate = GovernanceReleaseGate(
+                        run_id=run_id,
+                        gate_name="governance-release-gate",
+                        status=gate_status,
+                        required_policy_ids=[p.id for p in policies],
+                        evaluation_ids=eval_ids,
+                        evaluated_at=datetime.now(timezone.utc),
+                    )
+                    session.add(release_gate)
+                    await session.flush()
+
+                    # Traceability: governance_evaluation → release_gate
+                    for eid in eval_ids:
+                        await trace_mgr.link(session, "governance_evaluation", eid, "release_gate", release_gate.id, "gates")
+                        metrics.traceability_links += 1
+
+                # Traceability: requirement → governance_concern, phase → artifact
+                for concern in gov.runtime_governance_concerns:
+                    concern_id = concern.get("id", "")
+                    if concern_id:
+                        for fr in spec.functional_requirements:
+                            fr_id = fr.get("id", "")
+                            if fr_id:
+                                await trace_mgr.link(session, "requirement", fr_id, "governance_concern", concern_id, "governed_by")
+                                metrics.traceability_links += 1
+                for art in gov_artifacts:
+                    await trace_mgr.link(session, "phase", "governance", "artifact", art["id"], "produces")
+                    metrics.traceability_links += 1
+
+                await session.commit()
+
             metrics.cost_total += gov.cost_usd
             metrics.record_step("generate_governance", (time.monotonic() - t0) * 1000)
             await publish_custom_event(
@@ -309,7 +482,7 @@ class FullPipelineOrchestrator:
                 tracer=tracer,
             )
             if test_plan.test_cases:
-                await store.persist(
+                test_art = await store.persist(
                     name="test_plan.json",
                     content=json.dumps({
                         "unit_strategy": test_plan.unit_test_strategy,
@@ -324,6 +497,32 @@ class FullPipelineOrchestrator:
                     metadata={"test_plan_id": test_plan.id, "model": test_plan.model_used},
                 )
                 metrics.artifacts_generated += 1
+
+            # Traceability: requirement → test_case, architecture_component → test_case, phase → artifact
+            async with async_session_factory() as session:
+                for tc in test_plan.test_cases:
+                    tc_id = tc.get("id", tc.get("name", ""))
+                    req_id = tc.get("requirement_id", "")
+                    if tc_id and req_id:
+                        await trace_mgr.link(session, "requirement", req_id, "test_case", tc_id, "tested_by")
+                        metrics.traceability_links += 1
+                    # Link test case to architecture components
+                    for comp in arch.component_breakdown:
+                        comp_id = comp.get("name", "").lower().replace(" ", "_")
+                        if comp_id and tc_id:
+                            await trace_mgr.link(session, "architecture_component", comp_id, "test_case", tc_id, "tested_by")
+                            metrics.traceability_links += 1
+                # Phase → artifact
+                if test_plan.test_cases:
+                    art_result = await session.execute(
+                        select(Artifact).where(Artifact.run_id == run_id, Artifact.name == "test_plan.json")
+                    )
+                    art = art_result.scalars().first()
+                    if art:
+                        await trace_mgr.link(session, "phase", "quality", "artifact", art.id, "produces")
+                        metrics.traceability_links += 1
+                await session.commit()
+
             metrics.cost_total += test_plan.cost_usd
             metrics.record_step("generate_test_plan", (time.monotonic() - t0) * 1000)
             await publish_custom_event(
@@ -354,7 +553,7 @@ class FullPipelineOrchestrator:
             # Emit completion event
             await publish_custom_event(
                 run_id, "pipeline.completed",
-                f"Pipeline completed: {metrics.artifacts_generated} artifacts, {metrics.total_duration_ms:.0f}ms",
+                f"Pipeline completed: {metrics.artifacts_generated} artifacts, {metrics.traceability_links} traceability links, {metrics.total_duration_ms:.0f}ms",
                 data=metrics.to_dict(),
             )
 

@@ -1,7 +1,7 @@
 # SESSION RECOVERY MANIFEST
 
-**Last Updated:** 2026-05-16T10:15:00Z  
-**Session:** Integrity Repair Validation  
+**Last Updated:** 2026-05-16T10:30:00Z  
+**Session:** Traceability and Governance Completion Pass  
 **Status:** ✅ COMPLETE
 
 ---
@@ -11,7 +11,7 @@
 ### Services
 | Service | Status | Port | PID |
 |---------|--------|------|-----|
-| API (FastAPI) | ✅ Running | 8000 | 77294 |
+| API (FastAPI) | ✅ Running | 8000 | 78764 |
 | Frontend (Next.js) | ✅ Running | 3000 | - |
 | PostgreSQL | ✅ Running | 5432 | - |
 | Redis | ✅ Running | 6379 | - |
@@ -32,14 +32,30 @@ Artifact hash mismatch caused by volatile derived fields (`artifact_hash`, `cont
 2. `apps/api/src/core/hashing.py` — Added `_filter_metadata_for_hash()`, `compute_artifact_hash()`, `extract_structured_output()`
 3. `apps/api/src/engines/model_providers.py` — LM Studio uses `extract_structured_output()`
 
-### Validation
-- **Golden Run:** `789c0b53-fc47-49d7-8c1c-354f7a7395f3`
+### Validation (Run `789c0b53`)
 - **Artifact Integrity:** 1.0 (12/12 verified)
-- **Overall Integrity:** 0.67 (traceability/governance not populated by design)
-- **Tests:** 30/30 passed
+- **Overall Integrity:** 0.67 (traceability/governance not yet populated)
 
-### Legacy Runs (marked in DB)
-- `d6da6253`, `03a6ba18`, `e384da5b`, `f3069377`, `64b223fd` — all marked as `legacy_hash_contract`
+---
+
+## Traceability and Governance Completion — COMPLETE
+
+### Problem
+Pipeline imported `TraceabilityManager` and `GovernanceEvaluation` but never called them. No traceability links or governance evaluations were persisted.
+
+### Fix Applied
+1. `apps/api/src/services/full_pipeline_orchestrator.py` — Extended with:
+   - Traceability link creation after each pipeline phase (requirement→AC, requirement→component, requirement→test, requirement→governance, component→test, concern→policy, policy→evaluation, evaluation→gate, phase→artifact)
+   - Governance evaluation creation for each active policy
+   - Release gate creation with all evaluation IDs
+   - Traceability links for governance concerns to policies and evaluations
+
+### Validation (Run `6a7f7ea0`)
+- **Overall Integrity:** 1.0 (all 6 components score 1.0)
+- **Traceability Links:** 215 created with edge hashes
+- **Governance Evaluations:** 10 created with integrity hashes
+- **Release Gates:** 1 created
+- **Events:** 239 (including traceability events)
 
 ---
 
@@ -47,7 +63,8 @@ Artifact hash mismatch caused by volatile derived fields (`artifact_hash`, `cont
 - `apps/api/src/services/artifact_store.py` — Artifact persistence with metadata sanitization
 - `apps/api/src/core/hashing.py` — Canonical hashing + structured output normalization
 - `apps/api/src/core/integrity.py` — Integrity verification engine
-- `apps/api/tests/test_artifact_hash_integrity.py` — 30 tests
+- `apps/api/src/services/full_pipeline_orchestrator.py` — Pipeline with traceability and governance
+- `apps/api/tests/test_artifact_hash_integrity.py` — 39 tests
 
 ## Evidence Reports
 - `evidence/artifact-integrity-root-cause.md`
@@ -57,14 +74,17 @@ Artifact hash mismatch caused by volatile derived fields (`artifact_hash`, `cont
 - `evidence/legacy-hash-contract-runs.md`
 - `evidence/artifact-hash-test-results.md`
 - `evidence/integrity-repair-validation.md`
+- `evidence/overall-integrity-gap-analysis.md`
+- `evidence/traceability-pipeline-diagnosis.md`
+- `evidence/governance-pipeline-diagnosis.md`
+- `evidence/traceability-contract.md`
+- `evidence/governance-evaluation-contract.md`
+- `evidence/traceability-governance-validation.md`
+- `evidence/golden-run-v3-integrity-report.md`
 
----
-
-## Database
-- **Connection:** `postgresql+asyncpg://governance:forge@localhost:5432/sdlc_factory`
-- **Key tables:** runs, artifacts, log_events, run_snapshots, integrity_verifications
+## Commits
+- `98299bb` — Fix artifact metadata sanitization and validate integrity repair
+- `[pending]` — Add traceability and governance persistence to golden pipeline
 
 ## Pending
 - GitHub push blocked (invalid token)
-- Traceability links not populated by pipeline (separate issue)
-- Governance evaluations not populated by pipeline (separate issue)
