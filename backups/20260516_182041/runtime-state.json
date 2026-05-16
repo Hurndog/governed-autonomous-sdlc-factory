@@ -1,15 +1,12 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-05-16T18:30:00+00:00",
-  "commit": "cbb52b9",
+  "timestamp": "2026-05-16T15:48:00+00:00",
+  "commit": "f6dd264",
   "tag": "v0.1.0-golden-integrity-runtime",
   "branch": "main",
   "repository": "/Users/marcovanhurne/governed-autonomous-sdlc-factory",
-  "remote": "https://github.com/Hurndog/governed-autonomous-sdlc-factory.git",
-  "github_synced": true,
   "services": {
     "api": {"port": 8000, "status": "running", "health": "ok"},
-    "frontend": {"port": 3000, "status": "running", "build": "ok"},
     "postgres": {"port": 5432, "status": "connected"},
     "redis": {"port": 6379, "status": "connected"},
     "ollama": {"port": 11434, "status": "running", "models": 3},
@@ -39,22 +36,16 @@
     "passing": 44,
     "failing": 0
   },
-  "frontend": {
-    "rooms": 12,
-    "typecheck": "passing",
-    "build": "29.5kB First Load JS"
-  },
   "backup": {
-    "id": "20260516_182041",
-    "path": "backups/20260516_182041/",
-    "size": "6.6MB",
-    "files": 36,
-    "repo_bundle_sha256": "9647b6fc4f73c3c20d1ae5cf04bfaa14d4654d5129112097798e753d1dd530da",
-    "restore_tested": true
+    "id": "20260516_154820",
+    "path": "backups/20260516_154820/",
+    "size": "5.7MB",
+    "files": 22,
+    "repo_bundle_sha256": "494bbce34840f91dd7b3f874882855e25983bddd7c040f0269f5f5b1e119058a"
   },
   "blockers": [
-    "No OpenAI/Anthropic API keys",
-    "Qdrant not running"
+    "GitHub PAT invalid (401 Unauthorized)",
+    "No OpenAI/Anthropic API keys"
   ],
   "integrity_api": {
     "endpoint": "POST /api/v1/pipeline/runs/{id}/verify-integrity",

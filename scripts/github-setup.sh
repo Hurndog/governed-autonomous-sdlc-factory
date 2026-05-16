@@ -8,6 +8,7 @@ REPO_NAME="governed-autonomous-sdlc-factory"
 REPO_PATH="/Users/marcovanhurne/governed-autonomous-sdlc-factory"
 GITHUB_USER="Hurndog"
 REMOTE_URL="https://github.com/${GITHUB_USER}/${REPO_NAME}.git"
+REMOTE_URL_WITH_TOKEN="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${REPO_NAME}.git"
 EVIDENCE_DIR="${REPO_PATH}/evidence"
 
 echo "=== GitHub Setup ==="
@@ -95,7 +96,8 @@ LOCAL_HEAD=$(git rev-parse HEAD)
 echo "Local HEAD: ${LOCAL_HEAD}"
 
 echo "Pushing main branch..."
-if ! git push -u origin main 2>&1; then
+# Use token-embedded URL for push (avoids credential helper issues)
+if ! git push -u "${REMOTE_URL_WITH_TOKEN}" main 2>&1; then
     echo "ERROR: Push failed"
     echo "Check: token has 'repo' scope, repo exists, no branch protection"
     exit 1
@@ -103,7 +105,7 @@ fi
 
 # ─── 5. Push tags ──────────────────────────────────────────────────────
 echo "Pushing tags..."
-git push --tags 2>&1 || echo "WARNING: Tag push failed (non-fatal)"
+git push --tags "${REMOTE_URL_WITH_TOKEN}" 2>&1 || echo "WARNING: Tag push failed (non-fatal)"
 
 # ─── 6. Verify remote parity ───────────────────────────────────────────
 echo "Verifying remote parity..."

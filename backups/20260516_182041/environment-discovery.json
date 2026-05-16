@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-05-15T15:45:00+00:00",
+  "machine": "macOS (Darwin)",
+  "hostname": "marcos-mac-studio",
+
+  "infrastructure": {
+    "lm_studio": {
+      "installed": true,
+      "path": "/Applications/LM Studio.app",
+      "api_endpoint": "http://localhost:1234/v1",
+      "api_accessible": false,
+      "server_enabled": false,
+      "note": "LM Studio is installed but the local server is not running"
+    },
+    "ollama": {
+      "installed": true,
+      "version": "0.23.4",
+      "path": "/usr/local/bin/ollama",
+      "api_endpoint": "http://localhost:11434",
+      "api_accessible": true,
+      "running": true,
+      "models": [
+        {"name": "phi3:mini", "size": "2.3GB", "context": 4096, "type": "chat"},
+        {"name": "qwen2.5:1.5b", "size": "1.5GB", "context": 32768, "type": "chat"},
+        {"name": "gpt-oss:20b", "size": "12GB", "context": 131072, "type": "chat", "reasoning": true}
+      ]
+    },
+    "docker": {
+      "installed": true,
+      "version": "29.4.3",
+      "running": true,
+      "containers": [
+        {"name": "postgres", "status": "healthy", "port": 5432},
+        {"name": "redis", "status": "healthy", "port": 6379},
+        {"name": "qdrant", "status": "unhealthy", "port": 6333}
+      ]
+    },
+    "database": {
+      "postgres": {
+        "running": true,
+        "port": 5432,
+        "accessible_via_docker": true,
+        "local_pg_isready": false,
+        "note": "Accessible via Docker network, not localhost directly"
+      },
+      "redis": {
+        "running": true,
+        "port": 6379,
+        "accessible_via_docker": true
+      },
+      "qdrant": {
+        "running": true,
+        "port": 6333,
+        "status": "unhealthy"
+      }
+    }
+  },
+
+  "runtime": {
+    "python": {"version": "3.11.15", "path": "/Users/marcovanhurne/.hermes/hermes-agent/venv/bin/python3"},
+    "node": {"version": "22.22.2", "path": "/Users/marcovanhurne/.hermes/node/bin/node"},
+    "pnpm": {"version": "11.0.9", "path": "/Users/marcovanhurne/.hermes/node/bin/pnpm"},
+    "git": {"version": "2.50.1", "path": "/usr/bin/git"}
+  },
+
+  "repository": {
+    "path": "/Users/marcovanhurne/governed-autonomous-sdlc-factory",
+    "branch": "main",
+    "commits": 5,
+    "latest_commit": "3852c47",
+    "remotes": [],
+    "untracked_files": ["evidence/cognitive-execution-status.md"],
+    "git_user": "Hurndog",
+    "git_email": "150154045+Hurndog@users.noreply.github.com"
+  },
+
+  "ports": {
+    "5432": "postgres (Docker)",
+    "6379": "redis (Docker)",
+    "6333": "qdrant (Docker)",
+    "11434": "ollama",
+    "1234": "lm_studio (not running)",
+    "8000": "api (was running, now stopped)"
+  },
+
+  "environment_variables": {
+    "MEM0_API_KEY": "present (masked)",
+    "TWILIO_AUTH_TOKEN": "present (masked)",
+    "OPENAI_API_KEY": "NOT SET",
+    "ANTHROPIC_API_KEY": "NOT SET",
+    "GITHUB_TOKEN": "NOT SET"
+  },
+
+  "system": {
+    "disk_free_gb": 767,
+    "disk_used_percent": 2,
+    "memory_page_size": 16384,
+    "memory_free_pages": 23520,
+    "memory_active_pages": 655004
+  },
+
+  "blockers": [
+    "LM Studio server not enabled — needs GUI interaction to start",
+    "No .env file — API keys not configured",
+    "No GitHub remote — no offsite backup",
+    "Qdrant unhealthy — memory service may not work",
+    "No OPENAI_API_KEY or ANTHROPIC_API_KEY — remote LLM inference unavailable"
+  ],
+
+  "opportunities": [
+    "Ollama running with 3 models — can use immediately for local inference",
+    "gpt-oss:20b available — capable model for architecture/governance reasoning",
+    "Docker infrastructure healthy — postgres + redis running",
+    "Git configured with GitHub email — ready for remote setup",
+    "767GB free disk — plenty of space for models and artifacts"
+  ]
+}
