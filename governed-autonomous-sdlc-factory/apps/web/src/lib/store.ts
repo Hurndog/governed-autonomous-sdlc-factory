@@ -1,14 +1,25 @@
 import { create } from 'zustand';
 import type {
   RuntimeHealth,
-  Pipeline,
+  RunItem,
   ReplaySession,
-  GovernanceFinding,
-  ModelStatus,
-  TokenUsage,
-  Artifact,
-  Specification,
-  Architecture,
+  GovernanceEvaluation,
+  GovernancePolicy,
+  ReleaseGate,
+  ArtifactItem,
+  ArtifactDetail,
+  ProviderStatus,
+  LogEntry,
+  CostReport,
+  TraceabilityLink,
+  IntegrityResponse,
+  EvidenceBundle,
+  ProjectItem,
+  ModelStatusResponse,
+  SpecificationItem,
+  SpecificationDetail,
+  ArchitectureItem,
+  ArchitectureDetail,
 } from './types';
 
 interface AppState {
@@ -20,11 +31,17 @@ interface AppState {
   health: RuntimeHealth | null;
   setHealth: (h: RuntimeHealth | null) => void;
 
-  // Pipelines
-  pipelines: Pipeline[];
-  setPipelines: (p: Pipeline[]) => void;
-  activePipeline: Pipeline | null;
-  setActivePipeline: (p: Pipeline | null) => void;
+  // Runs
+  runs: RunItem[];
+  setRuns: (r: RunItem[]) => void;
+  selectedRunId: string | null;
+  setSelectedRunId: (id: string | null) => void;
+  selectedRunDetail: RunItem | null;
+  setSelectedRunDetail: (r: RunItem | null) => void;
+
+  // Timeline
+  timelineEvents: Array<{ id: string; sequence: number; type: string; timestamp: string; phase?: string; data?: Record<string, unknown>; hash?: string }>;
+  setTimelineEvents: (e: Array<{ id: string; sequence: number; type: string; timestamp: string; phase?: string; data?: Record<string, unknown>; hash?: string }>) => void;
 
   // Replay
   replaySessions: ReplaySession[];
@@ -35,30 +52,58 @@ interface AppState {
   setReplayTimelinePosition: (pos: number) => void;
 
   // Governance
-  governanceFindings: GovernanceFinding[];
-  setGovernanceFindings: (g: GovernanceFinding[]) => void;
+  governanceEvaluations: GovernanceEvaluation[];
+  setGovernanceEvaluations: (g: GovernanceEvaluation[]) => void;
+  governancePolicies: GovernancePolicy[];
+  setGovernancePolicies: (p: GovernancePolicy[]) => void;
+  releaseGates: ReleaseGate[];
+  setReleaseGates: (g: ReleaseGate[]) => void;
 
-  // Models
-  modelStatuses: ModelStatus[];
-  setModelStatuses: (m: ModelStatus[]) => void;
-  tokenUsage: TokenUsage | null;
-  setTokenUsage: (t: TokenUsage | null) => void;
+  // Traceability
+  traceabilityLinks: TraceabilityLink[];
+  setTraceabilityLinks: (l: TraceabilityLink[]) => void;
+
+  // Integrity
+  integrityResult: IntegrityResponse | null;
+  setIntegrityResult: (r: IntegrityResponse | null) => void;
+  integrityLoading: boolean;
+  setIntegrityLoading: (l: boolean) => void;
 
   // Artifacts
-  artifacts: Artifact[];
-  setArtifacts: (a: Artifact[]) => void;
+  artifacts: ArtifactItem[];
+  setArtifacts: (a: ArtifactItem[]) => void;
+
+  // Evidence
+  evidenceBundles: EvidenceBundle[];
+  setEvidenceBundles: (b: EvidenceBundle[]) => void;
+
+  // Models
+  modelStatus: ModelStatusResponse | null;
+  setModelStatus: (m: ModelStatusResponse | null) => void;
+
+  // Logs
+  logs: LogEntry[];
+  setLogs: (l: LogEntry[]) => void;
+
+  // Costs
+  costReport: CostReport | null;
+  setCostReport: (c: CostReport | null) => void;
+
+  // Projects
+  projects: ProjectItem[];
+  setProjects: (p: ProjectItem[]) => void;
 
   // Spec
-  specifications: Specification[];
-  setSpecifications: (s: Specification[]) => void;
-  activeSpec: Specification | null;
-  setActiveSpec: (s: Specification | null) => void;
+  specifications: SpecificationItem[];
+  setSpecifications: (s: SpecificationItem[]) => void;
+  activeSpec: SpecificationDetail | null;
+  setActiveSpec: (s: SpecificationDetail | null) => void;
 
   // Architecture
-  architectures: Architecture[];
-  setArchitectures: (a: Architecture[]) => void;
-  activeArch: Architecture | null;
-  setActiveArch: (a: Architecture | null) => void;
+  architectures: ArchitectureItem[];
+  setArchitectures: (a: ArchitectureItem[]) => void;
+  activeArch: ArchitectureDetail | null;
+  setActiveArch: (a: ArchitectureDetail | null) => void;
 
   // WebSocket
   wsConnected: boolean;
@@ -67,6 +112,26 @@ interface AppState {
   // Sidebar
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (c: boolean) => void;
+
+  // Loading states
+  globalLoading: boolean;
+  setGlobalLoading: (l: boolean) => void;
+
+  // Errors
+  lastError: string | null;
+  setLastError: (e: string | null) => void;
+
+  // Legacy compatibility (for existing components)
+  pipelines: RunItem[];
+  setPipelines: (p: RunItem[]) => void;
+  activePipeline: RunItem | null;
+  setActivePipeline: (p: RunItem | null) => void;
+  governanceFindings: GovernanceEvaluation[];
+  setGovernanceFindings: (g: GovernanceEvaluation[]) => void;
+  modelStatuses: ProviderStatus[];
+  setModelStatuses: (m: ProviderStatus[]) => void;
+  tokenUsage: CostReport | null;
+  setTokenUsage: (t: CostReport | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -76,10 +141,15 @@ export const useStore = create<AppState>((set) => ({
   health: null,
   setHealth: (h) => set({ health: h }),
 
-  pipelines: [],
-  setPipelines: (p) => set({ pipelines: p }),
-  activePipeline: null,
-  setActivePipeline: (p) => set({ activePipeline: p }),
+  runs: [],
+  setRuns: (r) => set({ runs: r, pipelines: r }),
+  selectedRunId: null,
+  setSelectedRunId: (id) => set({ selectedRunId: id }),
+  selectedRunDetail: null,
+  setSelectedRunDetail: (r) => set({ selectedRunDetail: r, activePipeline: r }),
+
+  timelineEvents: [],
+  setTimelineEvents: (e) => set({ timelineEvents: e }),
 
   replaySessions: [],
   setReplaySessions: (r) => set({ replaySessions: r }),
@@ -88,16 +158,37 @@ export const useStore = create<AppState>((set) => ({
   replayTimelinePosition: 0,
   setReplayTimelinePosition: (pos) => set({ replayTimelinePosition: pos }),
 
-  governanceFindings: [],
-  setGovernanceFindings: (g) => set({ governanceFindings: g }),
+  governanceEvaluations: [],
+  setGovernanceEvaluations: (g) => set({ governanceEvaluations: g, governanceFindings: g }),
+  governancePolicies: [],
+  setGovernancePolicies: (p) => set({ governancePolicies: p }),
+  releaseGates: [],
+  setReleaseGates: (g) => set({ releaseGates: g }),
 
-  modelStatuses: [],
-  setModelStatuses: (m) => set({ modelStatuses: m }),
-  tokenUsage: null,
-  setTokenUsage: (t) => set({ tokenUsage: t }),
+  traceabilityLinks: [],
+  setTraceabilityLinks: (l) => set({ traceabilityLinks: l }),
+
+  integrityResult: null,
+  setIntegrityResult: (r) => set({ integrityResult: r }),
+  integrityLoading: false,
+  setIntegrityLoading: (l) => set({ integrityLoading: l }),
 
   artifacts: [],
   setArtifacts: (a) => set({ artifacts: a }),
+
+  evidenceBundles: [],
+  setEvidenceBundles: (b) => set({ evidenceBundles: b }),
+
+  modelStatus: null,
+  setModelStatus: (m) => set({ modelStatus: m }),
+  logs: [],
+  setLogs: (l) => set({ logs: l }),
+
+  costReport: null,
+  setCostReport: (c) => set({ costReport: c, tokenUsage: c }),
+
+  projects: [],
+  setProjects: (p) => set({ projects: p }),
 
   specifications: [],
   setSpecifications: (s) => set({ specifications: s }),
@@ -114,4 +205,22 @@ export const useStore = create<AppState>((set) => ({
 
   sidebarCollapsed: false,
   setSidebarCollapsed: (c) => set({ sidebarCollapsed: c }),
+
+  globalLoading: false,
+  setGlobalLoading: (l) => set({ globalLoading: l }),
+
+  lastError: null,
+  setLastError: (e) => set({ lastError: e }),
+
+  // Legacy
+  pipelines: [],
+  setPipelines: (p) => set({ pipelines: p, runs: p }),
+  activePipeline: null,
+  setActivePipeline: (p) => set({ activePipeline: p, selectedRunDetail: p }),
+  governanceFindings: [],
+  setGovernanceFindings: (g) => set({ governanceFindings: g, governanceEvaluations: g }),
+  modelStatuses: [],
+  setModelStatuses: (m) => set({ modelStatuses: m }),
+  tokenUsage: null,
+  setTokenUsage: (t) => set({ tokenUsage: t, costReport: t }),
 }));

@@ -46,11 +46,11 @@ export function TopBar() {
         </div>
 
         {/* Uptime */}
-        {health?.uptime && (
+        {health?.uptime_seconds && (
           <div className="flex items-center gap-1.5">
             <Clock className="w-3 h-3 text-zinc-600" />
             <span className="text-[10px] font-mono text-zinc-600">
-              {Math.floor(health.uptime / 60)}m
+              {Math.floor(health.uptime_seconds / 3600)}h {Math.floor((health.uptime_seconds % 3600) / 60)}m
             </span>
           </div>
         )}

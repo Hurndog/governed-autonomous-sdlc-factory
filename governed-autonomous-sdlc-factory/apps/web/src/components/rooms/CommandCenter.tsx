@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Card, Badge, Metric, StatusDot, ProgressBar, SectionHeader } from '@/components/ui/Card';
 import { useStore } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -20,22 +20,61 @@ import {
   Play,
   FileText,
   Network,
+  RefreshCw,
 } from 'lucide-react';
 
 export function CommandCenter() {
   const health = useStore((s) => s.health);
-  const pipelines = useStore((s) => s.pipelines);
-  const modelStatuses = useStore((s) => s.modelStatuses);
+  const setHealth = useStore((s) => s.setHealth);
+  const runs = useStore((s) => s.runs);
+  const setRuns = useStore((s) => s.setRuns);
+  const modelStatus = useStore((s) => s.modelStatus);
+  const setModelStatus = useStore((s) => s.setModelStatus);
+  const setLastError = useStore((s) => s.setLastError);
+
   const [intent, setIntent] = useState('');
+  const [projectName, setProjectName] = useState('');
   const [loading, setLoading] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleGenerate = async () => {
+  const loadData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [h, m, r] = await Promise.allSettled([
+        api.getHealth(),
+        api.getModelStatus(),
+        api.listRuns({ page_size: 10 }),
+      ]);
+      if (h.status === 'fulfilled') setHealth(h.value as any);
+      if (m.status === 'fulfilled') setModelStatus(m.value as any);
+      if (r.status === 'fulfilled') setRuns((r.value as any).items || (r.value as any).runs || []);
+    } catch (e: any) {
+      setLastError(e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [setHealth, setModelStatus, setRuns, setLastError]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleLaunchPipeline = async () => {
     if (!intent.trim()) return;
     setLoading(true);
+    setLastResult(null);
     try {
-      const result = await api.generateSpec(intent);
+      const result = await api.runFullPipeline({
+        intent: intent.trim(),
+        project_name: projectName || undefined,
+      });
       setLastResult(JSON.stringify(result, null, 2));
+      setIntent('');
+      setProjectName('');
+      // Refresh runs
+      const r = await api.listRuns({ page_size: 10 });
+      setRuns((r as any).items || (r as any).runs || []);
     } catch (e: any) {
       setLastResult(`Error: ${e.message}`);
     } finally {
@@ -43,8 +82,10 @@ export function CommandCenter() {
     }
   };
 
-  const checks = health?.checks || {};
-  const checkEntries = Object.entries(checks) as [string, string][];
+  const providers = modelStatus?.providers || [];
+  const routingPolicy = modelStatus?.routing_policy || {};
+  const activeRuns = runs.filter((r) => r.status === 'running');
+  const goldenRun = runs.find((r) => r.id === '6a7f7ea0-297f-435e-9bb2-899368c7d332');
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -59,9 +100,17 @@ export function CommandCenter() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={health?.status === 'healthy' ? 'emerald' : health?.status === 'degraded' ? 'amber' : 'red'}>
-            <StatusDot status={health?.status || 'inactive'} size="sm" pulse />
-            <span className="ml-1.5">{health?.status?.toUpperCase() || 'UNKNOWN'}</span>
+          <button
+            onClick={loadData}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-md text-zinc-400 text-xs font-mono hover:bg-zinc-800 transition-colors"
+          >
+            {refreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Refresh
+          </button>
+          <Badge variant={health?.status === 'ok' ? 'emerald' : 'red'}>
+            <StatusDot status={health?.status === 'ok' ? 'healthy' : 'critical'} size="sm" pulse />
+            <span className="ml-1.5">{(health?.status || 'UNKNOWN').toUpperCase()}</span>
           </Badge>
         </div>
       </div>
@@ -70,42 +119,42 @@ export function CommandCenter() {
       <div className="grid grid-cols-6 gap-4">
         <Card>
           <Metric
-            label="Active Pipelines"
-            value={pipelines.filter((p) => p.status === 'running').length}
-            sub={`${pipelines.length} total`}
+            label="Active Runs"
+            value={activeRuns.length}
+            sub={`${runs.length} total`}
             color="text-emerald-400"
-          />
-        </Card>
-        <Card>
-          <Metric
-            label="Replay Sessions"
-            value={useStore.getState().replaySessions.length}
-            sub="Forensic ready"
-            color="text-blue-400"
-          />
-        </Card>
-        <Card>
-          <Metric
-            label="Governance Findings"
-            value={useStore.getState().governanceFindings.length}
-            sub="Active"
-            color="text-amber-400"
           />
         </Card>
         <Card>
           <Metric
             label="Models Online"
-            value={modelStatuses.filter((m) => m.available).length}
-            sub={`${modelStatuses.length} configured`}
+            value={providers.filter((p: any) => p.status === 'online').length}
+            sub={`${providers.length} configured`}
             color="text-emerald-400"
           />
         </Card>
         <Card>
           <Metric
-            label="Total Tokens"
-            value="2.3K"
-            sub="This session"
+            label="Golden Run"
+            value={goldenRun ? (goldenRun.integrity_score?.toFixed(2) || '—') : '—'}
+            sub={goldenRun ? goldenRun.status : 'Not found'}
+            color={goldenRun?.integrity_score === 1.0 ? 'text-emerald-400' : 'text-zinc-200'}
+          />
+        </Card>
+        <Card>
+          <Metric
+            label="Uptime"
+            value={health?.uptime_seconds ? `${Math.floor(health.uptime_seconds / 3600)}h ${Math.floor((health.uptime_seconds % 3600) / 60)}m` : '—'}
+            sub={`v${health?.version || '—'}`}
             color="text-zinc-200"
+          />
+        </Card>
+        <Card>
+          <Metric
+            label="Database"
+            value={health?.database === 'connected' ? 'OK' : 'Error'}
+            sub={health?.redis === 'connected' ? 'Redis OK' : 'Redis ?'}
+            color={health?.database === 'connected' ? 'text-emerald-400' : 'text-red-400'}
           />
         </Card>
         <Card>
@@ -128,19 +177,26 @@ export function CommandCenter() {
             icon={<Zap className="w-4 h-4" />}
           />
           <div className="space-y-3">
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Project name (optional)"
+              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50"
+            />
             <textarea
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
               placeholder="E.g., Build a REST API for managing tasks with authentication, rate limiting, and audit logging..."
-              className="w-full h-28 bg-zinc-900/50 border border-zinc-800 rounded-md p-3 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50 resize-none"
+              className="w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-md p-3 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50 resize-none"
             />
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="zinc">Ollama gpt-oss:20b</Badge>
+                <Badge variant="zinc">Full Pipeline</Badge>
                 <Badge variant="zinc">Spec → Arch → Gov → Tests</Badge>
               </div>
               <button
-                onClick={handleGenerate}
+                onClick={handleLaunchPipeline}
                 disabled={loading || !intent.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-emerald-400 text-xs font-mono font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
@@ -149,7 +205,7 @@ export function CommandCenter() {
                 ) : (
                   <Play className="w-3.5 h-3.5" />
                 )}
-                {loading ? 'Generating...' : 'Generate Specification'}
+                {loading ? 'Launching...' : 'Launch Pipeline'}
               </button>
             </div>
             {lastResult && (
@@ -168,14 +224,15 @@ export function CommandCenter() {
           />
           <div className="space-y-2">
             {[
-              { label: 'New Pipeline', icon: Play, color: 'emerald' },
-              { label: 'Run Replay', icon: RotateCcw, color: 'blue' },
-              { label: 'Governance Audit', icon: Shield, color: 'amber' },
-              { label: 'Model Benchmark', icon: Cpu, color: 'zinc' },
-              { label: 'Export Evidence', icon: FileText, color: 'zinc' },
+              { label: 'Verify Golden Run', icon: Shield, color: 'emerald', action: 'integrity-room' },
+              { label: 'View Traceability', icon: Network, color: 'blue', action: 'traceability-room' },
+              { label: 'Browse Artifacts', icon: FileText, color: 'zinc', action: 'artifact-explorer' },
+              { label: 'View Evidence', icon: FileText, color: 'zinc', action: 'evidence-center' },
+              { label: 'Provider Status', icon: Cpu, color: 'zinc', action: 'settings-providers' },
             ].map((action) => (
               <button
                 key={action.label}
+                onClick={() => useStore.getState().setActiveRoom(action.action)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 transition-colors text-left"
               >
                 <action.icon className="w-4 h-4 text-zinc-600" />
@@ -186,7 +243,7 @@ export function CommandCenter() {
         </Card>
       </div>
 
-      {/* System Health Grid */}
+      {/* System Health + Model Router */}
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <SectionHeader
@@ -195,18 +252,20 @@ export function CommandCenter() {
             icon={<Database className="w-4 h-4" />}
           />
           <div className="grid grid-cols-3 gap-2">
-            {checkEntries.map(([key, value]) => (
+            {[
+              { label: 'API', value: health?.status || 'unknown' },
+              { label: 'Database', value: health?.database || 'unknown' },
+              { label: 'Redis', value: health?.redis || 'unknown' },
+            ].map(({ label, value }) => (
               <div
-                key={key}
+                key={label}
                 className="flex items-center gap-2 px-2 py-1.5 bg-zinc-900/50 rounded border border-zinc-800/50"
               >
                 <StatusDot
-                  status={value === 'pass' ? 'healthy' : value === 'warn' ? 'degraded' : 'critical'}
+                  status={value === 'connected' || value === 'ok' ? 'healthy' : value === 'degraded' ? 'degraded' : 'critical'}
                   size="sm"
                 />
-                <span className="text-[10px] font-mono text-zinc-500 uppercase">
-                  {key.replace(/_/g, ' ')}
-                </span>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase">{label}</span>
               </div>
             ))}
           </div>
@@ -219,81 +278,79 @@ export function CommandCenter() {
             icon={<Cpu className="w-4 h-4" />}
           />
           <div className="space-y-2">
-            <div className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-              <div className="flex items-center gap-2">
-                <StatusDot status="healthy" size="sm" pulse />
-                <span className="text-[11px] font-mono text-zinc-300">Ollama</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="emerald" size="sm">3 models</Badge>
-                <span className="text-[10px] font-mono text-zinc-600">localhost:11434</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-              <div className="flex items-center gap-2">
-                <StatusDot status="inactive" size="sm" />
-                <span className="text-[11px] font-mono text-zinc-300">LM Studio</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="zinc" size="sm">Server off</Badge>
-                <span className="text-[10px] font-mono text-zinc-600">localhost:1234</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-              <div className="flex items-center gap-2">
-                <StatusDot status="inactive" size="sm" />
-                <span className="text-[11px] font-mono text-zinc-300">OpenAI</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="zinc" size="sm">No key</Badge>
-                <span className="text-[10px] font-mono text-zinc-600">api.openai.com</span>
-              </div>
-            </div>
+            {providers.length === 0 ? (
+              <p className="text-[10px] font-mono text-zinc-600">No provider data — click Refresh</p>
+            ) : (
+              providers.map((provider: any) => (
+                <div
+                  key={provider.name}
+                  className="flex items-center justify-between px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50"
+                >
+                  <div className="flex items-center gap-2">
+                    <StatusDot status={provider.status === 'online' ? 'healthy' : 'inactive'} size="sm" pulse={provider.status === 'online'} />
+                    <span className="text-[11px] font-mono text-zinc-300">{provider.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={provider.status === 'online' ? 'emerald' : 'zinc'} size="sm">
+                      {provider.models?.length || 0} models
+                    </Badge>
+                    <span className="text-[10px] font-mono text-zinc-600">{provider.base_url}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>
 
-      {/* Active Pipelines */}
+      {/* Active Runs */}
       <Card>
         <SectionHeader
-          title="Active Pipelines"
+          title="Recent Runs"
           subtitle="SDLC execution status"
           icon={<Activity className="w-4 h-4" />}
         />
-        {pipelines.length === 0 ? (
+        {runs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-zinc-600">
             <Activity className="w-8 h-8 mb-3 opacity-30" />
-            <p className="text-xs font-mono">No active pipelines</p>
-            <p className="text-[10px] font-mono mt-1">Enter an intent above to begin</p>
+            <p className="text-xs font-mono">No runs loaded</p>
+            <p className="text-[10px] font-mono mt-1">Click Refresh or launch a pipeline</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {pipelines.map((p) => (
+            {runs.slice(0, 10).map((r) => (
               <div
-                key={p.id}
+                key={r.id}
                 className="flex items-center gap-4 px-4 py-3 bg-zinc-900/50 rounded border border-zinc-800/50"
               >
-                <StatusDot status={p.status} size="md" pulse={p.status === 'running'} />
+                <StatusDot status={r.status === 'running' ? 'running' : r.status === 'completed' ? 'completed' : r.status === 'failed' ? 'failed' : 'pending'} size="md" pulse={r.status === 'running'} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-zinc-200">{p.name}</span>
+                    <span className="text-xs font-mono text-zinc-200">{r.intent || r.id.slice(0, 24)}</span>
                     <Badge
                       variant={
-                        p.status === 'running'
+                        r.status === 'running'
                           ? 'emerald'
-                          : p.status === 'completed'
+                          : r.status === 'completed'
                           ? 'emerald'
-                          : p.status === 'failed'
+                          : r.status === 'failed'
                           ? 'red'
                           : 'amber'
                       }
                     >
-                      {p.status}
+                      {r.status}
                     </Badge>
+                    {r.id === '6a7f7ea0-297f-435e-9bb2-899368c7d332' && (
+                      <Badge variant="emerald" size="sm">GOLDEN</Badge>
+                    )}
                   </div>
-                  <ProgressBar value={p.progress} size="sm" showLabel />
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[9px] font-mono text-zinc-600">{new Date(r.created_at).toLocaleString()}</span>
+                    {r.model_provider && <span className="text-[9px] font-mono text-zinc-600">{r.model_provider}</span>}
+                    {r.integrity_score !== undefined && <span className="text-[9px] font-mono text-zinc-600">Integrity: {r.integrity_score.toFixed(2)}</span>}
+                  </div>
                 </div>
-                <span className="text-[10px] font-mono text-zinc-600">{p.stage}</span>
+                <span className="text-[10px] font-mono text-zinc-600">{r.event_count || 0} events</span>
               </div>
             ))}
           </div>

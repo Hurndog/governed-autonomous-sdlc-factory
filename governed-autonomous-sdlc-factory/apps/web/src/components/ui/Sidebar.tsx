@@ -13,14 +13,25 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  Play,
+  Link2,
+  Package,
+  FolderOpen,
+  Terminal,
+  Scale,
 } from 'lucide-react';
 
 const rooms = [
   { id: 'command-center', label: 'Command Center', icon: LayoutDashboard },
-  { id: 'spec-room', label: 'Spec Room', icon: FileText },
-  { id: 'architecture-room', label: 'Architecture', icon: Network },
-  { id: 'governance-room', label: 'Governance', icon: Shield },
+  { id: 'run-control', label: 'Run Control', icon: Play },
+  { id: 'integrity-room', label: 'Integrity', icon: Shield },
+  { id: 'traceability-room', label: 'Traceability', icon: Link2 },
+  { id: 'governance-room', label: 'Governance', icon: Scale },
   { id: 'replay-chamber', label: 'Replay Chamber', icon: RotateCcw },
+  { id: 'artifact-explorer', label: 'Artifacts', icon: Package },
+  { id: 'evidence-center', label: 'Evidence', icon: FolderOpen },
+  { id: 'logs-diagnostics', label: 'Logs', icon: Terminal },
+  { id: 'settings-providers', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -74,7 +85,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-3 px-2 space-y-1">
+      <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
         {rooms.map((room) => {
           const Icon = room.icon;
           const isActive = activeRoom === room.id;

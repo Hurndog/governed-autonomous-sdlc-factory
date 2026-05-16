@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, Badge, Metric, StatusDot, ProgressBar, SectionHeader } from '@/components/ui/Card';
 import { useStore } from '@/lib/store';
+import { api } from '@/lib/api';
 import {
   RotateCcw,
   Play,
@@ -17,20 +18,62 @@ import {
   Layers,
   ArrowRight,
   Activity,
+  Loader2,
+  Search,
 } from 'lucide-react';
 
 export function ReplayChamber() {
+  const selectedRunId = useStore((s) => s.selectedRunId);
   const replaySessions = useStore((s) => s.replaySessions);
-  const activeSession = useStore((s) => s.activeReplaySession);
+  const setReplaySessions = useStore((s) => s.setReplaySessions);
+  const activeReplaySession = useStore((s) => s.activeReplaySession);
+  const setActiveReplaySession = useStore((s) => s.setActiveReplaySession);
   const timelinePos = useStore((s) => s.replayTimelinePosition);
   const setTimelinePos = useStore((s) => s.setReplayTimelinePosition);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const setLastError = useStore((s) => s.setLastError);
 
-  const events = activeSession?.events || [];
+  const [runIdInput, setRunIdInput] = useState(selectedRunId || '6a7f7ea0-297f-435e-9bb2-899368c7d332');
+  const [loading, setLoading] = useState(false);
+  const [replaying, setReplaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const events = activeReplaySession?.events || [];
   const currentEvent = events[timelinePos] || null;
-  const integrityScore = activeSession?.integrity_score || 0;
-  const divergenceCount = activeSession?.divergence_count || 0;
+  const integrityScore = (activeReplaySession as any)?.integrity_score || (activeReplaySession as any)?.integrity_preserved ? 1.0 : 0;
+  const divergenceCount = (activeReplaySession as any)?.divergence_count || 0;
+
+  const handleLoadSessions = useCallback(async () => {
+    if (!runIdInput.trim()) return;
+    setLoading(true);
+    setLastError(null);
+    try {
+      const result = await api.getReplaySessions(runIdInput.trim());
+      const sessions = (result as any).sessions || [];
+      setReplaySessions(sessions);
+      if (sessions.length > 0) {
+        setActiveReplaySession(sessions[0] as any);
+      }
+    } catch (e: any) {
+      setLastError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [runIdInput, setReplaySessions, setActiveReplaySession, setLastError]);
+
+  const handleReplay = useCallback(async () => {
+    if (!runIdInput.trim()) return;
+    setReplaying(true);
+    setLastError(null);
+    try {
+      const result = await api.replayRun(runIdInput.trim());
+      // Reload sessions
+      await handleLoadSessions();
+    } catch (e: any) {
+      setLastError(e.message);
+    } finally {
+      setReplaying(false);
+    }
+  }, [runIdInput, handleLoadSessions, setLastError]);
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -49,16 +92,80 @@ export function ReplayChamber() {
         </Badge>
       </div>
 
-      {replaySessions.length === 0 && !activeSession ? (
+      {/* Controls */}
+      <Card glow="emerald">
+        <SectionHeader title="Replay Control" subtitle="Load or execute replay" icon={<RotateCcw className="w-4 h-4" />} />
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={runIdInput}
+            onChange={(e) => setRunIdInput(e.target.value)}
+            placeholder="Run ID"
+            className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50"
+          />
+          <button
+            onClick={handleLoadSessions}
+            disabled={loading || !runIdInput.trim()}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-md text-blue-400 text-xs font-mono font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            {loading ? 'Loading...' : 'Load Sessions'}
+          </button>
+          <button
+            onClick={handleReplay}
+            disabled={replaying || !runIdInput.trim()}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-emerald-400 text-xs font-mono font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {replaying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {replaying ? 'Replaying...' : 'Execute Replay'}
+          </button>
+        </div>
+      </Card>
+
+      {replaySessions.length === 0 && !activeReplaySession && !loading && (
         <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
           <RotateCcw className="w-12 h-12 mb-4 opacity-20" />
           <p className="text-sm font-mono">No replay sessions available</p>
           <p className="text-[10px] font-mono mt-2">
-            Execute a pipeline to generate replay data
+            Enter a run ID and click Load Sessions or Execute Replay
           </p>
         </div>
-      ) : (
+      )}
+
+      {(replaySessions.length > 0 || activeReplaySession) && (
         <>
+          {/* Replay Sessions */}
+          {replaySessions.length > 0 && (
+            <Card>
+              <SectionHeader title="Replay Sessions" subtitle={`${replaySessions.length} sessions`} icon={<Layers className="w-4 h-4" />} />
+              <div className="space-y-2">
+                {replaySessions.map((session: any) => (
+                  <button
+                    key={session.id}
+                    onClick={() => setActiveReplaySession(session)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-md border text-left transition-colors ${
+                      activeReplaySession?.id === session.id
+                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                        : 'bg-zinc-900/50 border-zinc-800/50 hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <StatusDot status={session.status === 'completed' ? 'completed' : session.status === 'running' ? 'running' : 'failed'} size="sm" />
+                    <div className="flex-1">
+                      <span className="text-xs font-mono text-zinc-200">{session.id.slice(0, 24)}...</span>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[9px] font-mono text-zinc-600">{session.event_count || 0} events</span>
+                        <span className="text-[9px] font-mono text-zinc-600">{session.divergence_count || 0} divergences</span>
+                      </div>
+                    </div>
+                    <Badge variant={session.status === 'completed' ? 'emerald' : session.status === 'running' ? 'amber' : 'red'}>
+                      {session.status}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {/* Metrics */}
           <div className="grid grid-cols-5 gap-4">
             <Card>
@@ -74,243 +181,19 @@ export function ReplayChamber() {
               <Metric label="Snapshots" value={Math.floor(events.length / 10)} color="text-blue-400" />
             </Card>
             <Card>
-              <Metric label="Semantic Transitions" value={events.filter((e: any) => e.semantic_transition).length} color="text-zinc-200" />
+              <Metric label="Session" value={activeReplaySession?.id?.slice(0, 8) || '—'} color="text-zinc-200" />
             </Card>
           </div>
 
-          {/* Timeline Scrubber */}
-          <Card glow={isPlaying ? 'emerald' : 'none'}>
-            <SectionHeader
-              title="Replay Timeline"
-              subtitle={`Event ${timelinePos + 1} of ${events.length} — ${isPlaying ? 'Playing' : 'Paused'}`}
-              icon={<Activity className="w-4 h-4" />}
-              action={
-                <div className="flex items-center gap-2">
-                  <Badge variant="zinc">{playbackSpeed}x</Badge>
-                </div>
-              }
-            />
-
-            {/* Timeline Bar */}
-            <div className="mb-4">
-              <div className="relative h-8 bg-zinc-900 rounded-md border border-zinc-800 overflow-hidden">
-                {/* Event markers */}
-                <div className="absolute inset-0 flex">
-                  {events.map((e: any, i: number) => (
-                    <div
-                      key={i}
-                      onClick={() => setTimelinePos(i)}
-                      className={`flex-1 border-r border-zinc-800/50 cursor-pointer transition-colors ${
-                        i === timelinePos
-                          ? 'bg-emerald-500/20'
-                          : i < timelinePos
-                          ? 'bg-emerald-500/5'
-                          : 'hover:bg-zinc-800/50'
-                      } ${e.divergence ? 'bg-red-500/10' : ''}`}
-                    />
-                  ))}
-                </div>
-                {/* Position indicator */}
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-emerald-400 transition-all duration-150"
-                  style={{ left: `${events.length > 0 ? (timelinePos / (events.length - 1)) * 100 : 0}%` }}
-                />
-              </div>
-              {/* Divergence markers */}
-              <div className="flex mt-1">
-                {events.map((e: any, i: number) => (
-                  <div key={i} className="flex-1">
-                    {e.divergence && (
-                      <div className="flex justify-center">
-                        <AlertTriangle className="w-3 h-3 text-red-400" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Playback Controls */}
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => setTimelinePos(0)}
-                className="p-2 rounded-md bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <SkipBack className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setTimelinePos(Math.max(0, timelinePos - 1))}
-                className="p-2 rounded-md bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <SkipBack className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-              >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </button>
-              <button
-                onClick={() => setTimelinePos(Math.min(events.length - 1, timelinePos + 1))}
-                className="p-2 rounded-md bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <SkipForward className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setTimelinePos(events.length - 1)}
-                className="p-2 rounded-md bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-              >
-                <SkipForward className="w-4 h-4" />
-              </button>
-              <div className="ml-4 flex items-center gap-2">
-                {[0.5, 1, 2, 4].map((speed) => (
-                  <button
-                    key={speed}
-                    onClick={() => setPlaybackSpeed(speed)}
-                    className={`px-2 py-1 rounded text-[10px] font-mono ${
-                      playbackSpeed === speed
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : 'text-zinc-600 hover:text-zinc-400'
-                    }`}
-                  >
-                    {speed}x
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          {/* Event Detail + Causal Graph */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Current Event */}
-            <Card className="col-span-2">
-              <SectionHeader
-                title="Event Detail"
-                subtitle={currentEvent ? `Seq #${currentEvent.sequence} — ${currentEvent.type}` : 'No event selected'}
-                icon={<Layers className="w-4 h-4" />}
-                action={
-                  currentEvent?.divergence ? (
-                    <Badge variant="red">DIVERGENCE</Badge>
-                  ) : (
-                    <Badge variant="emerald">CLEAN</Badge>
-                  )
-                }
-              />
-              {currentEvent ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-1">TYPE</span>
-                      <span className="text-[11px] font-mono text-zinc-200">{currentEvent.type}</span>
-                    </div>
-                    <div className="px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-1">TIMESTAMP</span>
-                      <span className="text-[11px] font-mono text-zinc-200">
-                        {new Date(currentEvent.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div className="px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-1">HASH</span>
-                      <span className="text-[10px] font-mono text-zinc-400 truncate block">
-                        {currentEvent.hash}
-                      </span>
-                    </div>
-                    <div className="px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-1">SEMANTIC TRANSITION</span>
-                      <span className="text-[11px] font-mono text-zinc-200">
-                        {currentEvent.semantic_transition || '—'}
-                      </span>
-                    </div>
-                  </div>
-                  {currentEvent.data && Object.keys(currentEvent.data).length > 0 && (
-                    <div className="px-3 py-2 bg-zinc-900/50 rounded border border-zinc-800/50">
-                      <span className="text-[9px] font-mono text-zinc-600 block mb-2">PAYLOAD</span>
-                      <pre className="text-[10px] font-mono text-zinc-400 overflow-auto max-h-32">
-                        {JSON.stringify(currentEvent.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center py-12 text-zinc-600">
-                  <p className="text-xs font-mono">Select an event from the timeline</p>
-                </div>
-              )}
-            </Card>
-
-            {/* Causal Chain */}
+          {/* Raw Response */}
+          {activeReplaySession && (
             <Card>
-              <SectionHeader title="Causal Chain" subtitle="Event lineage" icon={<GitBranch className="w-4 h-4" />} />
-              <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                {events.slice(Math.max(0, timelinePos - 5), timelinePos + 6).map((e: any, i: number) => {
-                  const actualIdx = Math.max(0, timelinePos - 5) + i;
-                  const isCurrent = actualIdx === timelinePos;
-                  return (
-                    <div
-                      key={actualIdx}
-                      onClick={() => setTimelinePos(actualIdx)}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                        isCurrent
-                          ? 'bg-emerald-500/10 border border-emerald-500/20'
-                          : 'hover:bg-zinc-800/50 border border-transparent'
-                      }`}
-                    >
-                      <span className="text-[9px] font-mono text-zinc-600 w-4">{actualIdx}</span>
-                      {e.divergence ? (
-                        <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
-                      ) : (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400/50 flex-shrink-0" />
-                      )}
-                      <span className="text-[10px] font-mono text-zinc-400 truncate">{e.type}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              <SectionHeader title="Replay Session Data" subtitle="Raw session response" icon={<Activity className="w-4 h-4" />} />
+              <pre className="text-[10px] font-mono text-zinc-400 bg-zinc-900/50 border border-zinc-800 rounded-md p-3 overflow-auto max-h-64">
+                {JSON.stringify(activeReplaySession, null, 2)}
+              </pre>
             </Card>
-          </div>
-
-          {/* Integrity Heatmap */}
-          <Card>
-            <SectionHeader
-              title="Integrity Heatmap"
-              subtitle="Per-event integrity verification"
-              icon={<Hash className="w-4 h-4" />}
-            />
-            <div className="flex gap-0.5">
-              {events.map((e: any, i: number) => (
-                <div
-                  key={i}
-                  onClick={() => setTimelinePos(i)}
-                  className={`h-6 flex-1 rounded-sm cursor-pointer transition-all ${
-                    e.divergence
-                      ? 'bg-red-500/40 hover:bg-red-500/60'
-                      : i <= timelinePos
-                      ? 'bg-emerald-500/30 hover:bg-emerald-500/50'
-                      : 'bg-zinc-800/50 hover:bg-zinc-700/50'
-                  }`}
-                  title={`Event ${i}: ${e.type}${e.divergence ? ' (DIVERGENCE)' : ''}`}
-                />
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-[9px] font-mono text-zinc-600">0</span>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-sm bg-emerald-500/30" />
-                  <span className="text-[9px] font-mono text-zinc-600">Verified</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-sm bg-red-500/40" />
-                  <span className="text-[9px] font-mono text-zinc-600">Divergence</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded-sm bg-zinc-800/50" />
-                  <span className="text-[9px] font-mono text-zinc-600">Pending</span>
-                </div>
-              </div>
-              <span className="text-[9px] font-mono text-zinc-600">{events.length}</span>
-            </div>
-          </Card>
+          )}
         </>
       )}
     </div>

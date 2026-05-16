@@ -91,7 +91,7 @@ export function Metric({ label, value, sub, trend, color }: MetricProps) {
 }
 
 interface StatusDotProps {
-  status: 'healthy' | 'degraded' | 'critical' | 'running' | 'completed' | 'failed' | 'pending' | 'active' | 'inactive';
+  status: string;
   size?: 'sm' | 'md' | 'lg';
   pulse?: boolean;
 }
