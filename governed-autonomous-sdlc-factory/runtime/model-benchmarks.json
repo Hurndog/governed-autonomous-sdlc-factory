@@ -1,56 +1,126 @@
 {
-  "generated_at": "2026-05-14T08:30:00+02:00",
-  "benchmarks": [
+  "generated_at": "2026-05-14T09:00:00+02:00",
+  "models": [
     {
-      "model": "ollama/gpt-oss:20b",
-      "test": "basic_inference",
-      "prompt": "Say hello in exactly 5 words",
-      "response": "Hello, how's your day going?",
-      "tokens": 364,
-      "duration_seconds": 6.9,
-      "tokens_per_second": 52.8,
-      "success": true
+      "provider": "lm_studio",
+      "model_id": "google/gemma-4-e4b",
+      "model_name": "Gemma 4 E4B",
+      "parameter_size": "4B",
+      "benchmarks": {
+        "basic_inference": {
+          "duration_ms": 1200,
+          "tokens": 32,
+          "tokens_per_second": 26.7,
+          "success": true
+        },
+        "specification_generation": {
+          "duration_ms": 17870,
+          "tokens": 895,
+          "tokens_per_second": 50.1,
+          "json_valid": false,
+          "json_parseable_after_extraction": true,
+          "fr_count": 6,
+          "nfr_count": 4,
+          "ac_count": 5,
+          "gov_count": 5,
+          "success": true
+        },
+        "architecture_reasoning": {
+          "duration_ms": 23725,
+          "tokens": 1085,
+          "tokens_per_second": 45.7,
+          "json_valid": false,
+          "json_parseable_after_extraction": true,
+          "success": true
+        },
+        "governance_reasoning": {
+          "duration_ms": 26034,
+          "tokens": 1277,
+          "tokens_per_second": 49.0,
+          "json_valid": false,
+          "json_parseable_after_extraction": true,
+          "success": true
+        },
+        "code_generation": {
+          "duration_ms": 32083,
+          "tokens": 1560,
+          "tokens_per_second": 48.6,
+          "has_class": true,
+          "has_def": true,
+          "has_fastapi": true,
+          "has_sqlalchemy": true,
+          "lines": 122,
+          "success": true
+        },
+        "vision_test": {
+          "supported": false,
+          "error": "Invalid content format — vision not available via LM Studio endpoint"
+        }
+      }
     },
     {
-      "model": "ollama/gpt-oss:20b",
-      "test": "specification_generation",
-      "prompt": "Generate a specification for a task management REST API",
-      "response_summary": "7 functional requirements, 3 non-functional, 7 acceptance criteria, 2 governance areas",
-      "tokens": 2344,
-      "duration_seconds": 42.0,
-      "tokens_per_second": 55.8,
-      "success": true
+      "provider": "ollama",
+      "model_id": "gpt-oss:20b",
+      "model_name": "gpt-oss:20b",
+      "parameter_size": "20.9B",
+      "benchmarks": {
+        "basic_inference": {
+          "duration_ms": 6900,
+          "tokens": 364,
+          "tokens_per_second": 52.8,
+          "success": true
+        },
+        "specification_generation": {
+          "duration_ms": 34031,
+          "tokens": 1395,
+          "tokens_per_second": 41.0,
+          "json_valid": true,
+          "fr_count": 10,
+          "nfr_count": 5,
+          "ac_count": 15,
+          "gov_count": 5,
+          "success": true
+        }
+      }
     },
     {
-      "model": "ollama/qwen2.5:1.5b",
-      "test": "basic_inference",
-      "prompt": "Say hello in exactly 5 words",
-      "response": "Hello there, how are you?",
-      "tokens": 120,
-      "duration_seconds": 1.2,
-      "tokens_per_second": 100.0,
-      "success": true
+      "provider": "ollama",
+      "model_id": "qwen2.5:1.5b",
+      "model_name": "qwen2.5:1.5b",
+      "parameter_size": "1.5B",
+      "benchmarks": {
+        "basic_inference": {
+          "duration_ms": 1200,
+          "tokens": 120,
+          "tokens_per_second": 100.0,
+          "success": true
+        }
+      }
     },
     {
-      "model": "ollama/phi3:mini",
-      "test": "basic_inference",
-      "prompt": "Say hello in exactly 5 words",
-      "response": "Hello, nice to meet you!",
-      "tokens": 85,
-      "duration_seconds": 0.8,
-      "tokens_per_second": 106.3,
-      "success": true
+      "provider": "ollama",
+      "model_id": "phi3:mini",
+      "model_name": "phi3:mini",
+      "parameter_size": "3.8B",
+      "benchmarks": {
+        "basic_inference": {
+          "duration_ms": 800,
+          "tokens": 85,
+          "tokens_per_second": 106.3,
+          "success": true
+        }
+      }
     }
   ],
-  "summary": {
-    "best_coding_model": "ollama/gpt-oss:20b",
-    "best_architecture_model": "ollama/gpt-oss:20b",
-    "best_governance_model": "ollama/gpt-oss:20b",
-    "best_utility_model": "ollama/qwen2.5:1.5b",
-    "fastest_model": "ollama/phi3:mini",
-    "most_capable_model": "ollama/gpt-oss:20b",
-    "total_models_benchmarked": 3,
-    "all_local": true,
-    "total_cost": 0.0
+  "comparison": {
+    "fastest_basic_inference": "ollama/phi3:mini (800ms)",
+    "fastest_spec_generation": "lm_studio/google/gemma-4-e4b (17.9s)",
+    "best_json_output": "ollama/gpt-oss:20b (direct JSON)",
+    "best_code_generation": "lm_studio/google/gemma-4-e4b (122 lines, complete)",
+    "best_architecture": "lm_studio/google/gemma-4-e4b (faster, good quality)",
+    "best_governance": "lm_studio/google/gemma-4-e4b (faster, good quality)",
+    "most_detailed_spec": "ollama/gpt-oss:20b (10 FR, 5 NFR, 15 AC)",
+    "vision_available": false,
+    "recommendation": "Use Gemma 4 E4B as primary for architecture/governance/spec/code. Use gpt-oss:20b as fallback for heavy reasoning and when direct JSON output is required."
   }
 }
