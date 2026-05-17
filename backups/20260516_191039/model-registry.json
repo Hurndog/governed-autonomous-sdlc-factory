@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-05-15T15:50:00+00:00",
+  "providers": {
+    "ollama": {
+      "endpoint": "http://localhost:11434",
+      "status": "running",
+      "models": [
+        {
+          "name": "gpt-oss:20b",
+          "size_gb": 13.8,
+          "context_length": 131072,
+          "reasoning": true,
+          "structured_output": true,
+          "cost_per_1k_tokens": 0.0,
+          "latency_tier": "medium",
+          "recommended_for": ["architecture_reasoning", "governance_reasoning", "code_generation", "long_context"],
+          "priority": 100
+        },
+        {
+          "name": "qwen2.5:1.5b",
+          "size_gb": 1.0,
+          "context_length": 32768,
+          "reasoning": true,
+          "structured_output": true,
+          "cost_per_1k_tokens": 0.0,
+          "latency_tier": "low",
+          "recommended_for": ["utility_reasoning", "classification", "quick_tasks"],
+          "priority": 50
+        },
+        {
+          "name": "phi3:mini",
+          "size_gb": 2.2,
+          "context_length": 4096,
+          "reasoning": false,
+          "structured_output": false,
+          "cost_per_1k_tokens": 0.0,
+          "latency_tier": "low",
+          "recommended_for": ["utility_tasks", "embeddings", "lightweight_classification"],
+          "priority": 25
+        }
+      ]
+    },
+    "lm_studio": {
+      "endpoint": "http://localhost:1234",
+      "status": "installed_but_server_disabled",
+      "models": [],
+      "note": "LM Studio is installed but the local server is not running. Needs GUI interaction to enable."
+    },
+    "openai": {
+      "status": "not_configured",
+      "note": "OPENAI_API_KEY not set"
+    },
+    "anthropic": {
+      "status": "not_configured",
+      "note": "ANTHROPIC_API_KEY not set"
+    }
+  },
+  "routing_policy": {
+    "prefer_local": true,
+    "default_provider": "ollama",
+    "default_model": "gpt-oss:20b",
+    "fallback_chain": ["ollama:gpt-oss:20b", "ollama:qwen2.5:1.5b", "lm_studio:local-model", "openai:gpt-4o-mini", "anthropic:claude-3-5-sonnet-20241022"],
+    "task_routing": {
+      "architecture_reasoning": "ollama:gpt-oss:20b",
+      "governance_reasoning": "ollama:gpt-oss:20b",
+      "code_generation": "ollama:gpt-oss:20b",
+      "specification_generation": "ollama:gpt-oss:20b",
+      "test_generation": "ollama:gpt-oss:20b",
+      "utility_tasks": "ollama:qwen2.5:1.5b",
+      "embeddings": "ollama:phi3:mini",
+      "classification": "ollama:qwen2.5:1.5b"
+    }
+  }
+}

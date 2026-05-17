@@ -1,3 +1,17 @@
+import type {
+  SemanticCoverageSummary,
+  SemanticRequirement,
+  SemanticAcceptanceCriterion,
+  SemanticTestObligation,
+  SemanticAlignmentEvaluation,
+  SemanticVerifierCritique,
+  SemanticMutationTest,
+  SemanticNegativeRequirement,
+  SemanticRuntimeEvidence,
+  SemanticCoverageReport,
+  SemanticWaiver,
+} from '@/lib/types';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
@@ -152,6 +166,36 @@ export const api = {
   listProjects: () => fetchJSON<ProjectsResponse>('/projects'),
   getProject: (projectId: string) => fetchJSON<ProjectDetail>(`/projects/${projectId}`),
   createProject: (data: { name: string; description?: string }) => fetchJSON<ProjectDetail>('/projects', { method: 'POST', body: JSON.stringify(data) }),
+
+  // ─── Semantic Coverage ──────────────────────────────────────────────
+  getSemanticCoverageSummary: (runId: string) =>
+    fetchJSON<SemanticCoverageSummary>(`/semantic-coverage/runs/${runId}/summary`),
+  getSemanticRequirements: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; requirements: SemanticRequirement[] }>(`/semantic-coverage/runs/${runId}/requirements`),
+  getSemanticAcceptanceCriteria: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; acceptance_criteria: SemanticAcceptanceCriterion[] }>(`/semantic-coverage/runs/${runId}/acceptance-criteria`),
+  getSemanticTestObligations: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; obligations: SemanticTestObligation[] }>(`/semantic-coverage/runs/${runId}/test-obligations`),
+  getSemanticAlignment: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; evaluations: SemanticAlignmentEvaluation[] }>(`/semantic-coverage/runs/${runId}/alignment`),
+  getSemanticVerifierCritiques: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; critiques: SemanticVerifierCritique[] }>(`/semantic-coverage/runs/${runId}/verifier-critiques`),
+  getSemanticMutations: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; killed: number; survived: number; mutations: SemanticMutationTest[] }>(`/semantic-coverage/runs/${runId}/mutations`),
+  getSemanticNegativeCoverage: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; pending: number; generated: number; requirements: SemanticNegativeRequirement[] }>(`/semantic-coverage/runs/${runId}/negative-coverage`),
+  getSemanticRuntimeEvidence: (runId: string) =>
+    fetchJSON<{ run_id: string; total: number; bound: number; failed: number; bindings: SemanticRuntimeEvidence[] }>(`/semantic-coverage/runs/${runId}/runtime-evidence`),
+  getSemanticCoverageReport: (runId: string) =>
+    fetchJSON<SemanticCoverageReport>(`/semantic-coverage/runs/${runId}/report`),
+  evaluateSemanticCoverage: (runId: string) =>
+    fetchJSON<{ run_id: string; status: string; overall_semantic_coverage_score: number; critical_requirements_passed: boolean; release_gate_status: string }>(`/semantic-coverage/runs/${runId}/evaluate`, { method: 'POST' }),
+  createSemanticWaiver: (runId: string, params: { requirement_id: string; waiver_reason: string; waiver_scope?: string; approved_by?: string }) => {
+    const q = new URLSearchParams({ requirement_id: params.requirement_id, waiver_reason: params.waiver_reason });
+    if (params.waiver_scope) q.set('waiver_scope', params.waiver_scope);
+    if (params.approved_by) q.set('approved_by', params.approved_by);
+    return fetchJSON<SemanticWaiver>(`/semantic-coverage/runs/${runId}/waivers?${q}`, { method: 'POST' });
+  },
 };
 
 // ─── Type Definitions ──────────────────────────────────────────────

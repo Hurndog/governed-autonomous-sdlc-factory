@@ -318,3 +318,121 @@ export interface TestPlanDetail extends TestPlanItem {
   content?: string;
   test_cases?: Array<{ id: string; name: string; type: string; requirement_id?: string }>;
 }
+
+// ─── Semantic Coverage ─────────────────────────────────────────────────
+
+export interface SemanticCoverageSummary {
+  run_id: string;
+  status?: string;
+  message?: string;
+  overall_semantic_coverage_score: number;
+  obligation_coverage_score: number;
+  semantic_alignment_score: number;
+  mutation_score: number;
+  negative_coverage_score: number;
+  runtime_evidence_score: number;
+  verifier_confidence_score: number;
+  critical_requirements_passed: boolean;
+  release_gate_status: string;
+  report: Record<string, unknown> | null;
+}
+
+export interface SemanticRequirement {
+  requirement_id: string;
+  normalized_statement: string;
+  actor: string;
+  action: string;
+  object: string;
+  criticality: string;
+  security_relevance: boolean;
+  governance_relevance: boolean;
+  ambiguity_score: number;
+  testability_score: number;
+}
+
+export interface SemanticAcceptanceCriterion {
+  acceptance_criterion_id: string;
+  requirement_id: string;
+  given: string;
+  when: string;
+  then: string;
+  negative_case_required: boolean;
+  security_case_required: boolean;
+  governance_case_required: boolean;
+}
+
+export interface SemanticTestObligation {
+  obligation_id: string;
+  requirement_id: string;
+  obligation_type: string;
+  proof_statement: string;
+  required_test_type: string;
+  criticality: string;
+  status: string;
+}
+
+export interface SemanticAlignmentEvaluation {
+  evaluation_id: string;
+  test_case_id: string;
+  requirement_id: string;
+  obligation_id: string;
+  semantic_alignment_score: number;
+  verifier_verdict: string;
+  can_broken_code_pass: boolean;
+  critique: string;
+}
+
+export interface SemanticVerifierCritique {
+  test_case_id: string;
+  obligation_id: string;
+  verifier_model: string;
+  verdict: string;
+  confidence: number;
+  critique: string;
+  recommendations: string[] | null;
+}
+
+export interface SemanticMutationTest {
+  mutation_id: string;
+  requirement_id: string;
+  mutation_type: string;
+  mutated_component: string;
+  expected_test_failure: boolean;
+  actual_test_result: string | null;
+  killed: boolean;
+  survived: boolean;
+}
+
+export interface SemanticNegativeRequirement {
+  requirement_id: string;
+  required_negative_case: string;
+  status: string;
+}
+
+export interface SemanticRuntimeEvidence {
+  test_case_id: string;
+  obligation_id: string;
+  evidence_type: string;
+  binding_status: string;
+}
+
+export interface SemanticCoverageReport {
+  run_id: string;
+  scores: {
+    obligation_coverage: number;
+    semantic_alignment: number;
+    mutation: number;
+    negative_coverage: number;
+    runtime_evidence: number;
+    verifier_confidence: number;
+    overall: number;
+  };
+  critical_requirements_passed: boolean;
+  release_gate_status: string;
+  report: Record<string, unknown> | null;
+}
+
+export interface SemanticWaiver {
+  waiver_id: string;
+  status: string;
+}

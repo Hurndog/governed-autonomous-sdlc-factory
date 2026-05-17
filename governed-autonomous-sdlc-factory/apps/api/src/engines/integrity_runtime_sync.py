@@ -124,6 +124,7 @@ class IntegrityVerifier:
             results.append(self._verify_timeline_chain(session))
             results.append(self._verify_traceability_integrity(session))
             results.append(self._verify_governance_integrity(session))
+            results.append(self._verify_semantic_coverage(session))  # NEW: 7th component
 
             # Build report
             report.total_checks = len(results)
@@ -515,6 +516,56 @@ class IntegrityVerifier:
                 "missing_hashes": missing_hashes,
             },
         )
+
+    def _verify_semantic_coverage(self, session: Session) -> IntegrityComponentResult:
+        """Verify semantic coverage — the 7th integrity component."""
+        try:
+            from src.core.models_semantic_coverage import SemanticCoverageReport
+
+            report = session.execute(
+                select(SemanticCoverageReport).where(
+                    SemanticCoverageReport.run_id == self.run_id
+                )
+            ).scalar_one_or_none()
+
+            if not report:
+                return IntegrityComponentResult(
+                    verification_type="semantic_coverage",
+                    status="warning",
+                    integrity_score=0.0,
+                    details={
+                        "message": "No semantic coverage report for this run",
+                        "status": "pre_semantic_coverage",
+                    },
+                )
+
+            score = report.overall_semantic_coverage_score
+            status = "pass" if score >= 0.90 else "warning" if score >= 0.50 else "fail"
+
+            return IntegrityComponentResult(
+                verification_type="semantic_coverage",
+                status=status,
+                integrity_score=round(score, 4),
+                details={
+                    "overall_score": score,
+                    "obligation_coverage": report.obligation_coverage_score,
+                    "semantic_alignment": report.semantic_alignment_score,
+                    "mutation_score": report.mutation_score,
+                    "negative_coverage": report.negative_coverage_score,
+                    "runtime_evidence": report.runtime_evidence_score,
+                    "verifier_confidence": report.verifier_confidence_score,
+                    "critical_requirements_passed": report.critical_requirements_passed,
+                    "release_gate_status": report.release_gate_status,
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Semantic coverage verification failed: {e}")
+            return IntegrityComponentResult(
+                verification_type="semantic_coverage",
+                status="warning",
+                integrity_score=0.0,
+                details={"message": f"Semantic coverage check error: {str(e)}"},
+            )
 
 
 def verify_integrity_sync(run_id: str) -> dict:

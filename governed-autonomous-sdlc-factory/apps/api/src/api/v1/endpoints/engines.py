@@ -148,7 +148,11 @@ async def diff_specifications(
     user=Depends(get_current_user),
 ):
     """Diff two specification versions."""
-    return {"from": from_version, "to": to_version, "diff": "not implemented"}
+    from fastapi import HTTPException, status
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Specification diff is not yet implemented. Use /specification/{run_id}/latest to retrieve individual versions.",
+    )
 
 
 # =============================================================================

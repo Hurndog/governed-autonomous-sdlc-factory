@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-05-16T18:30:00+00:00",
+  "commit": "cbb52b9",
+  "tag": "v0.1.0-golden-integrity-runtime",
+  "branch": "main",
+  "repository": "/Users/marcovanhurne/governed-autonomous-sdlc-factory",
+  "remote": "https://github.com/Hurndog/governed-autonomous-sdlc-factory.git",
+  "github_synced": true,
+  "services": {
+    "api": {"port": 8000, "status": "running", "health": "ok"},
+    "frontend": {"port": 3000, "status": "running", "build": "ok"},
+    "postgres": {"port": 5432, "status": "connected"},
+    "redis": {"port": 6379, "status": "connected"},
+    "ollama": {"port": 11434, "status": "running", "models": 3},
+    "lm_studio": {"port": 1234, "status": "running", "models": 2},
+    "qdrant": {"port": 6333, "status": "configured"}
+  },
+  "golden_run": {
+    "id": "6a7f7ea0-297f-435e-9bb2-899368c7d332",
+    "integrity_score": 1.0,
+    "components": {
+      "event_chain": 1.0,
+      "snapshot": 1.0,
+      "artifact": 1.0,
+      "timeline": 1.0,
+      "traceability": 1.0,
+      "governance": 1.0
+    },
+    "events": 239,
+    "artifacts": 12,
+    "traceability_links": 215,
+    "governance_evaluations": 10,
+    "release_gates": 1
+  },
+  "tests": {
+    "suite": "test_artifact_hash_integrity.py",
+    "total": 44,
+    "passing": 44,
+    "failing": 0
+  },
+  "frontend": {
+    "rooms": 12,
+    "typecheck": "passing",
+    "build": "29.5kB First Load JS"
+  },
+  "backup": {
+    "id": "20260516_182041",
+    "path": "backups/20260516_182041/",
+    "size": "6.6MB",
+    "files": 36,
+    "repo_bundle_sha256": "9647b6fc4f73c3c20d1ae5cf04bfaa14d4654d5129112097798e753d1dd530da",
+    "restore_tested": true
+  },
+  "blockers": [
+    "No OpenAI/Anthropic API keys",
+    "Qdrant not running"
+  ],
+  "integrity_api": {
+    "endpoint": "POST /api/v1/pipeline/runs/{id}/verify-integrity",
+    "status": "operational",
+    "stability": "3/3 calls identical",
+    "greenlet_errors": 0
+  }
+}

@@ -1,5 +1,7 @@
 """Database engine and session management."""
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker
 from src.core.config import settings
 from src.models import Base
 
@@ -16,6 +18,17 @@ async_session_factory = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+# Sync engine for operations that require synchronous SQLAlchemy (integrity, semantic coverage)
+_sync_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://").replace("postgresql+asyncpg", "postgresql+psycopg2")
+sync_engine = create_engine(
+    _sync_url,
+    echo=False,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+)
+SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False)
 
 
 async def get_db() -> AsyncSession:

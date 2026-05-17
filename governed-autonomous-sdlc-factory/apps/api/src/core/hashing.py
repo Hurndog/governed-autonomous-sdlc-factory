@@ -206,6 +206,7 @@ def verify_chain(hashes: list[str]) -> bool:
     """Verify a chain of hashes is unbroken.
     
     Each hash after genesis must equal H(previous_hash || current_content_hash).
+    The final computed chain hash must match the last stored hash.
     """
     if not hashes:
         return True
@@ -213,7 +214,7 @@ def verify_chain(hashes: list[str]) -> bool:
     for h in hashes:
         chain_hash = compute_chain_hash(chain_hash, h)
     # The final chain hash should match the last element if stored
-    return True  # Chain integrity verified by recomputation
+    return chain_hash == hashes[-1]
 
 
 # ---------------------------------------------------------------------------
