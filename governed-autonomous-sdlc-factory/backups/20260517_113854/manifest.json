@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-05-17T11:38:54Z",
+  "local_head": "7e1bbd4",
+  "remote_head": "7e1bbd4",
+  "branch": "main",
+  "tag": "v0.4.0-operational-safety",
+  "components": {
+    "backend": "FastAPI + LangGraph + SQLAlchemy",
+    "frontend": "Next.js 14 + Tailwind + shadcn/ui",
+    "database": "PostgreSQL",
+    "models": "Ollama + LM Studio"
+  },
+  "integrity_components": 7,
+  "semantic_coverage_score": 0.6559,
+  "integrity_score": 0.9508,
+  "backend_tests": "82/82 passing",
+  "frontend_build": "passing",
+  "safety_guards": "implemented (11 guard types)",
+  "conflict_detection": "4 patterns implemented",
+  "files_included": [
+    "repo.bundle",
+    "db.sql.gz",
+    "evidence/",
+    "checksums.sha256",
+    "manifest.json",
+    "RESTORE.md"
+  ]
+}
