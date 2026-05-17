@@ -491,3 +491,214 @@ def test_full_pipeline_produces_all_record_types(engine, db, run_id):
     assert len(neg_reqs) > 0, "Should have negative test requirements"
 
     assert report is not None, "Should have a semantic coverage report"
+
+
+# ─── Conflict Detection Tests ────────────────────────────────────────────
+
+class FakeReq:
+    """Minimal mock for conflict detection testing."""
+    def __init__(self, req_id, text):
+        self.requirement_id = req_id
+        self.original_text = text
+
+
+def test_conflict_detection_immutability_vs_editability():
+    """Test that immutability vs editability conflicts are detected."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "All incident records must be immutable."),
+        FakeReq("REQ-002", "Admins must be able to permanently edit incident records after closure."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) >= 1, f"Expected at least 1 conflict, got {len(conflicts)}"
+    assert any(c.conflict_type == "immutability_vs_editability" for c in conflicts)
+
+
+def test_conflict_detection_retention_vs_deletion():
+    """Test that retention vs deletion conflicts are detected."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "Records must be retained for seven years."),
+        FakeReq("REQ-002", "Users must be able to permanently delete records at any time."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) >= 1, f"Expected at least 1 conflict, got {len(conflicts)}"
+    assert any(c.conflict_type == "retention_vs_deletion" for c in conflicts)
+
+
+def test_conflict_detection_auditability_vs_no_logging():
+    """Test that auditability vs no logging conflicts are detected."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "Escalation decisions must be auditable."),
+        FakeReq("REQ-002", "The system must not store logs for escalation decisions."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) >= 1, f"Expected at least 1 conflict, got {len(conflicts)}"
+    assert any(c.conflict_type == "auditability_vs_no_logging" for c in conflicts)
+
+
+def test_conflict_detection_tenant_isolation_vs_cross_tenant():
+    """Test that tenant isolation vs cross-tenant access conflicts are detected."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "Users may only access incidents from their own tenant."),
+        FakeReq("REQ-002", "Support users may access all tenant incidents without approval."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) >= 1, f"Expected at least 1 conflict, got {len(conflicts)}"
+    assert any(c.conflict_type == "tenant_isolation_vs_cross_tenant_access" for c in conflicts)
+
+
+def test_conflict_detection_no_false_positives():
+    """Test that non-conflicting requirements are not flagged."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "Users can create incidents."),
+        FakeReq("REQ-002", "Users can view their own incidents."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) == 0, f"Expected 0 conflicts, got {len(conflicts)}"
+
+
+def test_conflict_severity_and_gate_impact():
+    """Test that conflicts have correct severity and release gate impact."""
+    from src.core.conflict_detection import ConflictDetector
+    detector = ConflictDetector("test-run")
+    reqs = [
+        FakeReq("REQ-001", "All incident records must be immutable."),
+        FakeReq("REQ-002", "Admins must be able to permanently edit incident records after closure."),
+    ]
+    conflicts = detector.detect_conflicts(reqs)
+    assert len(conflicts) >= 1
+    c = conflicts[0]
+    assert c.severity in ("high", "critical"), f"Expected high/critical severity, got {c.severity}"
+    assert c.release_gate_impact == "fail", f"Expected 'fail' gate impact, got {c.release_gate_impact}"
+
+
+# ─── Safety Guard Tests ──────────────────────────────────────────────────
+
+def test_safety_guard_pipeline_timeout():
+    """Test that pipeline timeout guard activates."""
+    from src.core.safety_guards import SafetyGuard, GuardStatus
+    import time
+
+    guard = SafetyGuard("test-run")
+    # Simulate elapsed time beyond timeout
+    guard.start_time = time.monotonic() - 1000  # 1000 seconds ago
+    from src.core.config import settings
+    original_timeout = settings.pipeline_timeout_seconds
+    settings.pipeline_timeout_seconds = 500  # 500 second timeout
+    try:
+        status = guard._check_pipeline_timeout()
+        assert status == GuardStatus.STOPPED_BY_PIPELINE_TIMEOUT
+        assert guard.is_stopped
+    finally:
+        settings.pipeline_timeout_seconds = original_timeout
+
+
+def test_safety_guard_model_call_budget():
+    """Test that model call budget guard activates."""
+    from src.core.safety_guards import SafetyGuard, GuardStatus
+    from src.core.config import settings
+
+    guard = SafetyGuard("test-run")
+    guard.begin_phase("test_phase")
+    original_limit = settings.max_model_calls_per_phase
+    settings.max_model_calls_per_phase = 3
+    try:
+        for _ in range(3):
+            guard.record_model_call()
+        status = guard._check_model_call_budget()
+        assert status == GuardStatus.STOPPED_BY_MODEL_CALL_BUDGET
+        assert guard.is_stopped
+    finally:
+        settings.max_model_calls_per_phase = original_limit
+
+
+def test_safety_guard_retry_limit():
+    """Test that retry limit guard activates."""
+    from src.core.safety_guards import SafetyGuard, GuardStatus
+    from src.core.config import settings
+
+    guard = SafetyGuard("test-run")
+    guard.begin_phase("test_phase")
+    original_limit = settings.max_retries_per_phase
+    settings.max_retries_per_phase = 2
+    try:
+        guard.record_retry()
+        guard.record_retry()
+        status = guard._check_retry_limit()
+        assert status == GuardStatus.STOPPED_BY_RETRY_LIMIT
+        assert guard.is_stopped
+    finally:
+        settings.max_retries_per_phase = original_limit
+
+
+def test_safety_guard_semantic_iteration_limit():
+    """Test that semantic iteration limit guard activates."""
+    from src.core.safety_guards import SafetyGuard, GuardStatus
+    from src.core.config import settings
+
+    guard = SafetyGuard("test-run")
+    original_limit = settings.max_semantic_iterations
+    settings.max_semantic_iterations = 3
+    try:
+        for _ in range(3):
+            guard.record_semantic_iteration()
+        status = guard._check_semantic_iteration_limit()
+        assert status == GuardStatus.STOPPED_BY_SEMANTIC_ITERATION_LIMIT
+        assert guard.is_stopped
+    finally:
+        settings.max_semantic_iterations = original_limit
+
+
+def test_safety_guard_not_triggered_when_within_limits():
+    """Test that guards don't activate when within limits."""
+    from src.core.safety_guards import SafetyGuard
+    import time
+
+    guard = SafetyGuard("test-run")
+    guard.start_time = time.monotonic()  # Just started
+    guard.begin_phase("test_phase")
+    guard.record_model_call()
+    guard.record_retry()
+
+    status = guard.check_all()
+    assert status is None, f"Expected no guard activation, got {status}"
+    assert not guard.is_stopped
+
+
+def test_safety_guard_persists_evidence():
+    """Test that guard activation persists evidence to the database."""
+    import time
+    from src.core.safety_guards import SafetyGuard, GuardStatus, GuardActivation
+    from src.core.config import settings
+
+    test_run_id = "guard-evidence-test-run"
+    guard = SafetyGuard(test_run_id)
+    guard.start_time = time.monotonic() - 1000
+    original_timeout = settings.pipeline_timeout_seconds
+    settings.pipeline_timeout_seconds = 500
+    try:
+        guard._check_pipeline_timeout()
+        # Verify evidence was persisted
+        db = SyncSessionLocal()
+        activations = db.query(GuardActivation).filter(
+            GuardActivation.run_id == test_run_id
+        ).all()
+        assert len(activations) >= 1, f"Expected at least 1 activation record, got {len(activations)}"
+        assert activations[0].guard_name == "pipeline_timeout"
+        assert activations[0].resulting_status == "stopped_by_pipeline_timeout"
+        # Clean up
+        for a in activations:
+            db.delete(a)
+        db.commit()
+        db.close()
+    finally:
+        settings.pipeline_timeout_seconds = original_timeout
