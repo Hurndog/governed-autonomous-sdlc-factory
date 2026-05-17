@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { GaugeChart } from '@/components/ui/GaugeChart';
 import { Badge } from '@/components/ui/Badge';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
 import {
   mockApplication, mockBuildRun, mockScores, mockPhases, mockAgents,
   mockRequirements, mockTokenUsage, mockGovGates, mockProcessEvents,
@@ -14,10 +16,50 @@ import {
 import {
   Activity, AlertTriangle, Bot, CheckCircle2, Clock, Coins,
   GitBranch, Shield, Target, Zap, TrendingUp, TrendingDown,
-  ArrowRight, CircleDot,
+  ArrowRight, CircleDot, Wifi, WifiOff,
 } from 'lucide-react';
+import type { HealthResponse, ModelStatusResponse, ListRunsResponse, IntegrityResponse } from '@/lib/api';
 
 export function Dashboard() {
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
+  const [runs, setRuns] = useState<ListRunsResponse | null>(null);
+  const [integrity, setIntegrity] = useState<IntegrityResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [healthRes, modelsRes, runsRes] = await Promise.allSettled([
+          api.getHealth(),
+          api.getModelStatus(),
+          api.listRuns({ page_size: 5 }),
+        ]);
+        if (healthRes.status === 'fulfilled') setHealth(healthRes.value);
+        if (modelsRes.status === 'fulfilled') setModelStatus(modelsRes.value);
+        if (runsRes.status === 'fulfilled') setRuns(runsRes.value);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch backend data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Determine overall data source state
+  const hasHealth = health !== null;
+  const hasRuns = runs !== null && runs.items && runs.items.length > 0;
+  const hasModels = modelStatus !== null;
+  const dataSourceState = hasHealth && hasRuns ? 'LIVE' : (hasHealth || hasRuns ? 'PARTIAL' : 'MOCK');
+
+  // Use real data where available, mock as fallback
+  const latestRun = runs?.items?.[0];
   const activeAgents = mockAgents.filter(a => a.status === 'working');
   const completedPhases = mockPhases.filter(p => p.status === 'completed').length;
   const failedGates = mockGovGates.filter(g => g.status === 'failed');
@@ -26,6 +68,12 @@ export function Dashboard() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      {/* Data source banner */}
+      <DataSourceBanner
+        state={loading ? 'LOADING' : dataSourceState}
+        message={error ? `Backend: ${error}` : undefined}
+      />
+
       {/* Hero Section */}
       <div className="card-elevated p-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-blue-500/5" />
@@ -39,12 +87,22 @@ export function Dashboard() {
                 <h1 className="text-xl font-bold text-zinc-100">{mockApplication.name}</h1>
                 <p className="text-xs text-zinc-500">{mockApplication.description}</p>
               </div>
+              <DataSourceBadge state={loading ? 'LOADING' : dataSourceState} />
             </div>
             <div className="flex items-center gap-4 mt-4">
               <Badge variant="violet" dot>Building</Badge>
               <span className="text-xs text-zinc-600">Phase {mockBuildRun.currentPhase}/{mockBuildRun.totalPhases}: {mockPhases.find(p => p.status === 'active')?.name}</span>
               <span className="text-xs text-zinc-600">•</span>
               <span className="text-xs text-zinc-600">{activeAgents.length} agents active</span>
+              {hasHealth && (
+                <>
+                  <span className="text-xs text-zinc-600">•</span>
+                  <span className="text-xs text-zinc-600 flex items-center gap-1">
+                    {health?.status === 'healthy' ? <Wifi className="w-3 h-3 text-emerald-400" /> : <WifiOff className="w-3 h-3 text-red-400" />}
+                    Backend: {health?.status || 'unknown'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-6">
@@ -151,7 +209,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Active Agents */}
+        {/* Active Agents + Recent Events */}
         <div className="col-span-4 card p-4">
           <SectionHeader title="Active Agents" subtitle={`${activeAgents.length} working`} />
           <div className="space-y-2">
@@ -162,12 +220,11 @@ export function Dashboard() {
                   <div className="text-[11px] font-medium text-zinc-300 truncate">{agent.name}</div>
                   <div className="text-[9px] text-zinc-600 truncate">{agent.currentTask}</div>
                 </div>
-                <StatusChip status={agent.status === 'working' ? 'active' : agent.status === 'waiting' ? 'pending' : 'idle'} size="sm" />
+                <StatusChip status={agent.status === 'working' ? 'active' : agent.status === 'waiting' ? 'waiting' : 'idle'} size="sm" />
               </div>
             ))}
           </div>
 
-          {/* Recent Events */}
           <div className="mt-4 pt-3 border-t border-[#1e2230]">
             <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-2">Recent Events</div>
             <div className="space-y-1.5 max-h-32 overflow-y-auto scrollbar-thin">
@@ -185,7 +242,6 @@ export function Dashboard() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Critical Requirements */}
         <div className="card p-4">
           <SectionHeader title="Critical Requirements" subtitle={`${coveredCritical.length}/${criticalReqs.length} covered`} />
           <div className="space-y-2">
@@ -199,7 +255,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Governance Gates */}
         <div className="card p-4">
           <SectionHeader title="Governance Gates" subtitle={`${mockGovGates.filter(g => g.status === 'passed').length}/${mockGovGates.length} passed`} />
           <div className="space-y-2">
@@ -213,7 +268,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Token Burn */}
         <div className="card p-4">
           <SectionHeader title="Token Burn" subtitle={`$${mockTokenUsage.budgetRemaining.toFixed(2)} remaining`} />
           <div className="space-y-2">

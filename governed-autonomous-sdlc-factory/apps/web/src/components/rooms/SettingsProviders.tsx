@@ -1,29 +1,112 @@
 'use client';
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { useStore } from '@/lib/store';
-import { Server, Cpu, HardDrive, Wifi, CheckCircle2, XCircle } from 'lucide-react';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
+import { Server, Cpu, HardDrive, Wifi, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import type { HealthResponse, ModelStatusResponse } from '@/lib/api';
 
 export function SettingsProviders() {
-  const modelStatus = useStore((s) => s.modelStatus);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'LIVE' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
 
-  const mockProviders = [
-    { name: 'OpenAI', model: 'gpt-4o', status: 'online', latency: '142ms', requests: 1247 },
-    { name: 'Anthropic', model: 'claude-sonnet-4', status: 'online', latency: '198ms', requests: 892 },
-    { name: 'Local LM Studio', model: 'llama-3.1-70b', status: 'online', latency: '45ms', requests: 2103 },
-    { name: 'Ollama', model: 'codellama-34b', status: 'offline', latency: '—', requests: 0 },
-  ];
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [healthRes, modelsRes] = await Promise.allSettled([
+        api.getHealth(),
+        api.getModelStatus(),
+      ]);
+      if (healthRes.status === 'fulfilled') setHealth(healthRes.value);
+      if (modelsRes.status === 'fulfilled') setModelStatus(modelsRes.value);
+      setDataSource('LIVE');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch settings');
+      setDataSource('ERROR');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const providers = (modelStatus?.providers || [
+    { name: 'OpenAI', default_model: 'gpt-4o', status: 'online' as const, is_local: false },
+    { name: 'Anthropic', default_model: 'claude-sonnet-4', status: 'online' as const, is_local: false },
+    { name: 'Local LM Studio', default_model: 'llama-3.1-70b', status: 'online' as const, is_local: true },
+    { name: 'Ollama', default_model: 'codellama-34b', status: 'offline' as const, is_local: true },
+  ]).map(p => ({
+    name: p.name,
+    model: p.default_model || '—',
+    status: p.status,
+    is_local: p.is_local,
+    latency: '—',
+    requests: 0,
+  }));
 
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <SectionHeader title="Settings & Providers" subtitle="Model provider configuration" />
+      <DataSourceBanner state={dataSource} message={error || undefined} />
+
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Settings & Providers" subtitle="Model provider configuration" />
+        <div className="flex items-center gap-2">
+          <DataSourceBadge state={dataSource} />
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 text-[10px] hover:bg-zinc-700/50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Backend Health */}
+      {health && (
+        <div className="card p-4">
+          <SectionHeader title="Backend Health" />
+          <div className="grid grid-cols-4 gap-3 mt-2">
+            <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+              <div className="text-[9px] text-zinc-700 uppercase">Status</div>
+              <div className="flex items-center gap-1 mt-0.5">
+                {health.status === 'healthy' ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-red-400" />}
+                <span className="text-[10px] text-zinc-300">{health.status}</span>
+              </div>
+            </div>
+            <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+              <div className="text-[9px] text-zinc-700 uppercase">Version</div>
+              <div className="text-[10px] text-zinc-300 mt-0.5">{health.version || '—'}</div>
+            </div>
+            <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+              <div className="text-[9px] text-zinc-700 uppercase">Database</div>
+              <div className="flex items-center gap-1 mt-0.5">
+                {health.database === 'connected' ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-red-400" />}
+                <span className="text-[10px] text-zinc-300">{health.database}</span>
+              </div>
+            </div>
+            <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+              <div className="text-[9px] text-zinc-700 uppercase">Uptime</div>
+              <div className="text-[10px] text-zinc-300 mt-0.5">{health.uptime_seconds ? `${Math.round(health.uptime_seconds)}s` : '—'}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-8 card p-4">
-          <SectionHeader title="Model Providers" />
+          <SectionHeader title="Model Providers" subtitle={`${providers.length} providers configured`} />
           <div className="space-y-2 mt-2">
-            {mockProviders.map(p => (
+            {providers.map(p => (
               <div key={p.name} className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/20 border border-zinc-800/40">
                 <Server className="w-4 h-4 text-zinc-500" />
                 <div className="flex-1">

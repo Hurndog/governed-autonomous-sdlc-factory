@@ -1,21 +1,84 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Badge } from '@/components/ui/Badge';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
 import { mockGovGates } from '@/lib/mock-data';
-import { Shield, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowRight, FileText, Download } from 'lucide-react';
+import { Shield, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowRight, FileText, Download, RefreshCw } from 'lucide-react';
+import type { GovernanceEvaluationsResponse, ReleaseGateResponse } from '@/lib/api';
 
 export function GovernanceGates() {
-  const passed = mockGovGates.filter(g => g.status === 'passed').length;
-  const failed = mockGovGates.filter(g => g.status === 'failed').length;
-  const blocked = mockGovGates.filter(g => g.status === 'blocked').length;
-  const pending = mockGovGates.filter(g => g.status === 'pending').length;
+  const [evaluations, setEvaluations] = useState<GovernanceEvaluationsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'LIVE' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
+
+  const fetchGovernance = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const runs = await api.listRuns({ page_size: 1 });
+      const latestRun = runs.items?.[0];
+      if (!latestRun) {
+        setError('No runs found');
+        setDataSource('ERROR');
+        return;
+      }
+      const result = await api.getGovernanceEvaluations(latestRun.id);
+      setEvaluations(result);
+      setDataSource('LIVE');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch governance data');
+      setDataSource('ERROR');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGovernance();
+  }, []);
+
+  // Use real evaluations if available, otherwise mock
+  const gates = dataSource === 'LIVE' && evaluations?.evaluations
+    ? evaluations.evaluations.map(ev => ({
+        id: ev.id,
+        name: ev.policy_name || ev.policy_id,
+        status: ev.status === 'pass' ? 'passed' : ev.status === 'fail' ? 'failed' : 'pending',
+        owner: 'Governance Agent',
+        timestamp: ev.created_at || '',
+        policyBasis: ev.policy_id,
+        impact: ev.severity === 'critical' ? 'critical' : ev.severity === 'warning' ? 'high' : 'medium',
+        evidence: ev.findings?.map(f => f.message) || [],
+      }))
+    : mockGovGates;
+
+  const passed = gates.filter(g => g.status === 'passed').length;
+  const failed = gates.filter(g => g.status === 'failed').length;
+  const blocked = gates.filter(g => g.status === 'blocked').length;
+  const pending = gates.filter(g => g.status === 'pending').length;
 
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <SectionHeader title="Governance & Release Gates" subtitle="Policy enforcement and release readiness" />
+      <DataSourceBanner state={dataSource} message={error || undefined} />
+
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Governance & Release Gates" subtitle="Policy enforcement and release readiness" />
+        <div className="flex items-center gap-2">
+          <DataSourceBadge state={dataSource} />
+          <button
+            onClick={fetchGovernance}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 text-[10px] hover:bg-zinc-700/50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
 
       {/* Summary */}
       <div className="grid grid-cols-4 gap-3">
@@ -41,7 +104,7 @@ export function GovernanceGates() {
       <div className="card p-4">
         <SectionHeader title="Governance Flow" subtitle="Sequential gate evaluation" />
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-thin py-2">
-          {mockGovGates.map((gate, i) => (
+          {gates.map((gate, i) => (
             <React.Fragment key={gate.id}>
               <div className={`flex-shrink-0 w-44 p-3 rounded-lg border ${
                 gate.status === 'passed' ? 'border-emerald-400/20 bg-emerald-400/5' :
@@ -57,7 +120,7 @@ export function GovernanceGates() {
                 <div className="text-[8px] text-zinc-600">{gate.owner}</div>
                 {gate.timestamp && <div className="text-[8px] text-zinc-700 mt-0.5">{gate.timestamp.slice(11, 16)}</div>}
               </div>
-              {i < mockGovGates.length - 1 && (
+              {i < gates.length - 1 && (
                 <ArrowRight className={`w-3 h-3 flex-shrink-0 ${
                   gate.status === 'passed' ? 'text-emerald-400/40' : 'text-zinc-800'
                 }`} />

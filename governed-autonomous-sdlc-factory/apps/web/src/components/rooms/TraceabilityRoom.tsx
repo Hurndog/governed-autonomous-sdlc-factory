@@ -1,14 +1,53 @@
 'use client';
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
-import { mockRequirements, mockSemanticCoverage } from '@/lib/mock-data';
-import { Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
+import { Link2, ArrowRight, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import type { TraceabilityResponse, CoverageResponse } from '@/lib/api';
 
 export function TraceabilityRoom() {
-  const links = [
+  const [traceability, setTraceability] = useState<TraceabilityResponse | null>(null);
+  const [coverage, setCoverage] = useState<CoverageResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'LIVE' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
+
+  const fetchTraceability = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const runs = await api.listRuns({ page_size: 1 });
+      const latestRun = runs.items?.[0];
+      if (!latestRun) {
+        setError('No runs found');
+        setDataSource('ERROR');
+        return;
+      }
+      const [traceRes, covRes] = await Promise.allSettled([
+        api.getTraceability(latestRun.id),
+        api.getTraceabilityCoverage(latestRun.id),
+      ]);
+      if (traceRes.status === 'fulfilled') setTraceability(traceRes.value);
+      if (covRes.status === 'fulfilled') setCoverage(covRes.value);
+      setDataSource('LIVE');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch traceability');
+      setDataSource('ERROR');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTraceability();
+  }, []);
+
+  const mockLinks = [
     { source: 'REQ-001', target: 'test_payment_gateway', type: 'validates', confidence: 0.95 },
     { source: 'REQ-001', target: 'arch-api-gateway', type: 'implemented-by', confidence: 0.92 },
     { source: 'REQ-002', target: 'test_balance_validation', type: 'validates', confidence: 0.98 },
@@ -18,9 +57,35 @@ export function TraceabilityRoom() {
     { source: 'ADR-003', target: 'REQ-004', type: 'enforces', confidence: 0.95 },
   ];
 
+  const links = dataSource === 'LIVE' && traceability?.links
+    ? traceability.links.map(l => ({
+        source: l.source_id,
+        target: l.target_id,
+        type: l.link_type,
+        confidence: l.confidence || 0.5,
+      }))
+    : mockLinks;
+
+  const coveragePct = coverage?.coverage_pct ?? 0.75;
+
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <SectionHeader title="Traceability" subtitle="Requirement → Test → Code → Evidence links" />
+      <DataSourceBanner state={dataSource} message={error || undefined} />
+
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Traceability" subtitle="Requirement → Test → Code → Evidence links" />
+        <div className="flex items-center gap-2">
+          <DataSourceBadge state={dataSource} />
+          <button
+            onClick={fetchTraceability}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 text-[10px] hover:bg-zinc-700/50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-8 card p-4">
@@ -48,7 +113,7 @@ export function TraceabilityRoom() {
           <div className="space-y-3 mt-2">
             <div>
               <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-1">Requirements → Tests</div>
-              <ProgressBar value={0.75} color="blue" showLabel />
+              <ProgressBar value={coveragePct} color="blue" showLabel />
             </div>
             <div>
               <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-1">Tests → Code</div>

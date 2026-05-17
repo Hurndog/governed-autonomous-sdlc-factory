@@ -1,17 +1,64 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { GaugeChart } from '@/components/ui/GaugeChart';
 import { Badge } from '@/components/ui/Badge';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
 import { mockSemanticCoverage, mockRequirements } from '@/lib/mock-data';
-import { Target, AlertTriangle, CheckCircle2, XCircle, Shield, Eye } from 'lucide-react';
+import { Target, AlertTriangle, CheckCircle2, XCircle, Shield, Eye, RefreshCw } from 'lucide-react';
+import type { SemanticCoverageReport, SemanticCoverageSummary } from '@/lib/types';
 
 export function SemanticCoverage() {
-  const [selectedReq, setSelectedReq] = useState<string | null>(null);
-  const coverage = mockSemanticCoverage;
+  const [report, setReport] = useState<SemanticCoverageReport | null>(null);
+  const [summary, setSummary] = useState<SemanticCoverageSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'LIVE' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
+
+  const fetchSemanticCoverage = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const runs = await api.listRuns({ page_size: 1 });
+      const latestRun = runs.items?.[0];
+      if (!latestRun) {
+        setError('No runs found');
+        setDataSource('ERROR');
+        return;
+      }
+      const [summaryRes, reportRes] = await Promise.allSettled([
+        api.getSemanticCoverageSummary(latestRun.id),
+        api.getSemanticCoverageReport(latestRun.id),
+      ]);
+      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
+      if (reportRes.status === 'fulfilled') setReport(reportRes.value);
+      setDataSource('LIVE');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch semantic coverage');
+      setDataSource('ERROR');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSemanticCoverage();
+  }, []);
+
+  // Use real data if available
+  const overallScore = summary?.overall_semantic_coverage_score ?? mockSemanticCoverage.overallScore;
+  const obligationCoverage = summary?.obligation_coverage_score ?? mockSemanticCoverage.obligationCoverage;
+  const semanticAlignment = summary?.semantic_alignment_score ?? mockSemanticCoverage.semanticAlignment;
+  const mutationScore = summary?.mutation_score ?? mockSemanticCoverage.mutationScore;
+  const negativeCoverage = summary?.negative_coverage_score ?? mockSemanticCoverage.negativeCoverage;
+  const runtimeEvidence = summary?.runtime_evidence_score ?? mockSemanticCoverage.runtimeEvidence;
+  const verifierConfidence = summary?.verifier_confidence_score ?? mockSemanticCoverage.verifierConfidence;
+  const criticalPassed = summary?.critical_requirements_passed ?? mockSemanticCoverage.criticalRequirementsPassed;
+  const gateStatus = summary?.release_gate_status ?? mockSemanticCoverage.releaseGateStatus;
 
   const cellColors: Record<string, string> = {
     covered: 'bg-emerald-400/20 text-emerald-400',
@@ -26,21 +73,37 @@ export function SemanticCoverage() {
 
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <SectionHeader title="Semantic Coverage & Test Alignment" subtitle="Proving tests actually validate requirements" />
+      <DataSourceBanner state={dataSource} message={error || undefined} />
+
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Semantic Coverage & Test Alignment" subtitle="Proving tests actually validate requirements" />
+        <div className="flex items-center gap-2">
+          <DataSourceBadge state={dataSource} />
+          <button
+            onClick={fetchSemanticCoverage}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 text-[10px] hover:bg-zinc-700/50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
 
       {/* Score gauges */}
       <div className="grid grid-cols-8 gap-3">
         <div className="card p-3 flex flex-col items-center">
-          <GaugeChart value={coverage.overallScore} label="Overall" size="md" color={coverage.overallScore >= 0.8 ? 'green' : coverage.overallScore >= 0.5 ? 'amber' : 'red'} />
+          <GaugeChart value={overallScore} label="Overall" size="md" color={overallScore >= 0.8 ? 'green' : overallScore >= 0.5 ? 'amber' : 'red'} />
         </div>
         {[
-          { label: 'Obligation', value: coverage.obligationCoverage },
-          { label: 'Alignment', value: coverage.semanticAlignment },
-          { label: 'Mutation', value: coverage.mutationScore },
-          { label: 'Negative', value: coverage.negativeCoverage },
-          { label: 'Runtime', value: coverage.runtimeEvidence },
-          { label: 'Verifier', value: coverage.verifierConfidence },
-          { label: 'Gate', value: coverage.releaseGateStatus === 'passed' ? 1 : 0 },
+          { label: 'Obligation', value: obligationCoverage },
+          { label: 'Alignment', value: semanticAlignment },
+          { label: 'Mutation', value: mutationScore },
+          { label: 'Negative', value: negativeCoverage },
+          { label: 'Runtime', value: runtimeEvidence },
+          { label: 'Verifier', value: verifierConfidence },
+          { label: 'Critical', value: criticalPassed ? 1 : 0 },
+          { label: 'Gate', value: gateStatus === 'passed' ? 1 : 0 },
         ].map(g => (
           <div key={g.label} className="card p-3 flex flex-col items-center">
             <GaugeChart value={g.value} label={g.label} size="sm" color={g.value >= 0.8 ? 'green' : g.value >= 0.5 ? 'amber' : 'red'} />
@@ -63,14 +126,10 @@ export function SemanticCoverage() {
               </tr>
             </thead>
             <tbody>
-              {coverage.coverageMatrix.map((row, i) => {
+              {mockSemanticCoverage.coverageMatrix.map((row, i) => {
                 const req = mockRequirements[i];
                 return (
-                  <tr
-                    key={row.requirementId}
-                    className={`border-b border-zinc-800/30 cursor-pointer hover:bg-zinc-800/20 ${selectedReq === row.requirementId ? 'bg-zinc-800/30' : ''}`}
-                    onClick={() => setSelectedReq(selectedReq === row.requirementId ? null : row.requirementId)}
-                  >
+                  <tr key={row.requirementId} className="border-b border-zinc-800/30 hover:bg-zinc-800/20">
                     <td className="py-1.5 px-2">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-zinc-400">{row.requirementId}</span>
@@ -102,11 +161,10 @@ export function SemanticCoverage() {
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        {/* False Confidence Detector */}
         <div className="col-span-6 card p-4">
           <SectionHeader title="False Confidence Detector" subtitle="Tests that pass but don't prove requirements" icon={<Eye className="w-3.5 h-3.5 text-amber-400" />} />
           <div className="space-y-2 mt-2">
-            {coverage.falseConfidenceTests.map(t => (
+            {mockSemanticCoverage.falseConfidenceTests.map(t => (
               <div key={t.testId} className="p-3 rounded-lg bg-amber-400/5 border border-amber-400/10">
                 <div className="flex items-center gap-2 mb-1">
                   <AlertTriangle className="w-3 h-3 text-amber-400" />
@@ -120,55 +178,15 @@ export function SemanticCoverage() {
           </div>
         </div>
 
-        {/* Release Gate Impact */}
         <div className="col-span-6 card p-4">
           <SectionHeader title="Release Gate Impact" subtitle="How semantic coverage affects release readiness" icon={<Shield className="w-3.5 h-3.5 text-violet-400" />} />
           <div className="space-y-3 mt-2">
             <div className="p-3 rounded-lg bg-red-400/5 border border-red-400/10">
               <div className="flex items-center gap-2 mb-1">
                 <XCircle className="w-3.5 h-3.5 text-red-400" />
-                <span className="text-[11px] font-medium text-red-400">Release Gate: FAILED</span>
+                <span className="text-[11px] font-medium text-red-400">Release Gate: {gateStatus === 'passed' ? 'PASSED' : 'FAILED'}</span>
               </div>
-              <div className="text-[9px] text-zinc-500">Semantic coverage score 65.6% is below the 80% threshold required for release.</div>
-            </div>
-
-            <div>
-              <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-2">Blocking Issues</div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-red-400">●</span>
-                  <span className="text-zinc-400">REQ-005 (Fraud Detection): 42% coverage — missing negative tests</span>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-red-400">●</span>
-                  <span className="text-zinc-400">REQ-008 (Dashboard): 35% coverage — only 1 test, no integration</span>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-amber-400">●</span>
-                  <span className="text-zinc-400">REQ-003 (Reconciliation): 71% coverage — missing contract tests</span>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-amber-400">●</span>
-                  <span className="text-zinc-400">3 false confidence tests detected — tests pass but don't prove requirements</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-2">Recommendations</div>
-              <div className="space-y-1">
-                {[
-                  'Add negative test cases for REQ-005 fraud detection paths',
-                  'Generate integration tests for REQ-008 dashboard components',
-                  'Replace shallow test_auth_check_exists with behavioral auth test',
-                  'Add contract tests for reconciliation API endpoints',
-                ].map((rec, i) => (
-                  <div key={i} className="flex items-start gap-1.5 text-[9px] text-zinc-500">
-                    <span className="text-violet-400 mt-0.5">→</span>
-                    {rec}
-                  </div>
-                ))}
-              </div>
+              <div className="text-[9px] text-zinc-500">Semantic coverage score {Math.round(overallScore * 100)}% is {overallScore >= 0.8 ? 'above' : 'below'} the 80% threshold.</div>
             </div>
           </div>
         </div>
