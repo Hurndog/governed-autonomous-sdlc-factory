@@ -1,190 +1,95 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { Card, Badge, Metric, SectionHeader } from '@/components/ui/Card';
+import React from 'react';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Badge } from '@/components/ui/Badge';
 import { useStore } from '@/lib/store';
-import { api } from '@/lib/api';
-import {
-  FileText,
-  Loader2,
-  Search,
-  Lock,
-  Unlock,
-  Hash,
-  Eye,
-  ChevronDown,
-  ChevronUp,
-  Package,
-} from 'lucide-react';
+import { Package, FileText, Code, TestTube, Shield, File, Hash, Clock, User, Tag, Search } from 'lucide-react';
 
 export function ArtifactExplorer() {
-  const selectedRunId = useStore((s) => s.selectedRunId);
   const artifacts = useStore((s) => s.artifacts);
-  const setArtifacts = useStore((s) => s.setArtifacts);
-  const setLastError = useStore((s) => s.setLastError);
 
-  const [runIdInput, setRunIdInput] = useState(selectedRunId || '6a7f7ea0-297f-435e-9bb2-899368c7d332');
-  const [loading, setLoading] = useState(false);
-  const [filterType, setFilterType] = useState('');
-  const [expandedArtifact, setExpandedArtifact] = useState<string | null>(null);
-  const [artifactContent, setArtifactContent] = useState<Record<string, string>>({});
-  const [loadingContent, setLoadingContent] = useState<string | null>(null);
+  const mockArtifacts = [
+    { id: 'art-001', type: 'specification', name: 'Product Specification v1', phase: 'Specification', agent: 'Product Analyst', status: 'accepted', version: 1, tokenCost: 4200, confidence: 0.92, date: '2026-05-14T06:12:00Z' },
+    { id: 'art-002', type: 'requirement', name: 'Normalized Requirements', phase: 'Requirements', agent: 'Requirement Normalizer', status: 'accepted', version: 2, tokenCost: 18400, confidence: 0.88, date: '2026-05-14T06:47:00Z' },
+    { id: 'art-003', type: 'architecture', name: 'Architecture Model v3', phase: 'Architecture', agent: 'Architecture Agent', status: 'accepted', version: 3, tokenCost: 34200, confidence: 0.85, date: '2026-05-14T07:39:00Z' },
+    { id: 'art-004', type: 'code', name: 'Payment Service', phase: 'Implementation', agent: 'Code Generation', status: 'tested', version: 1, tokenCost: 18400, confidence: 0.78, date: '2026-05-14T07:22:00Z' },
+    { id: 'art-005', type: 'code', name: 'Fraud Detection Service', phase: 'Implementation', agent: 'Code Generation', status: 'generated', version: 2, tokenCost: 16200, confidence: 0.65, date: '2026-05-14T07:48:00Z' },
+    { id: 'art-006', type: 'test', name: 'Test Suite v1', phase: 'Test Generation', agent: 'Test Generation', status: 'accepted', version: 1, tokenCost: 22100, confidence: 0.82, date: '2026-05-14T07:54:00Z' },
+    { id: 'art-007', type: 'coverage', name: 'Semantic Coverage Report', phase: 'Semantic Coverage', agent: 'Semantic Coverage', status: 'generated', version: 1, tokenCost: 15800, confidence: 0.72, date: '2026-05-14T08:14:00Z' },
+    { id: 'art-008', type: 'evidence', name: 'Evidence Bundle', phase: 'Evidence', agent: 'Evidence Agent', status: 'generated', version: 1, tokenCost: 1200, confidence: 0.91, date: '2026-05-14T08:14:00Z' },
+  ];
 
-  const handleLoad = useCallback(async () => {
-    if (!runIdInput.trim()) return;
-    setLoading(true);
-    setLastError(null);
-    try {
-      const result = await api.listArtifacts(runIdInput.trim(), filterType || undefined);
-      setArtifacts(result.artifacts || []);
-    } catch (e: any) {
-      setLastError(e.message);
-      setArtifacts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [runIdInput, filterType, setArtifacts, setLastError]);
+  const typeIcons: Record<string, React.ReactNode> = {
+    specification: <FileText className="w-3.5 h-3.5" />,
+    requirement: <File className="w-3.5 h-3.5" />,
+    architecture: <Shield className="w-3.5 h-3.5" />,
+    code: <Code className="w-3.5 h-3.5" />,
+    test: <TestTube className="w-3.5 h-3.5" />,
+    coverage: <Hash className="w-3.5 h-3.5" />,
+    evidence: <Package className="w-3.5 h-3.5" />,
+  };
 
-  const handleViewContent = useCallback(async (artifactId: string) => {
-    if (artifactContent[artifactId]) {
-      setExpandedArtifact(expandedArtifact === artifactId ? null : artifactId);
-      return;
-    }
-    setLoadingContent(artifactId);
-    try {
-      const detail = await api.getArtifact(artifactId);
-      setArtifactContent((prev) => ({ ...prev, [artifactId]: detail.content || 'No content available' }));
-      setExpandedArtifact(artifactId);
-    } catch (e: any) {
-      setLastError(e.message);
-    } finally {
-      setLoadingContent(null);
-    }
-  }, [artifactContent, expandedArtifact, setLastError]);
-
-  const artifactTypes = [...new Set(artifacts.map((a) => a.type))];
-  const filteredArtifacts = filterType ? artifacts.filter((a) => a.type === filterType) : artifacts;
+  const typeColors: Record<string, string> = {
+    specification: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+    requirement: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+    architecture: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+    code: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',
+    test: 'text-violet-400 bg-violet-400/10 border-violet-400/20',
+    coverage: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
+    evidence: 'text-pink-400 bg-pink-400/10 border-pink-400/20',
+  };
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-mono font-bold text-zinc-100 tracking-wide">
-            ARTIFACT EXPLORER
-          </h1>
-          <p className="text-[10px] font-mono text-zinc-600 mt-1">
-            Browse Artifacts — View Content — Verify Hashes
-          </p>
-        </div>
-        <Badge variant="emerald">
-          <Package className="w-3 h-3 mr-1" />
-          {artifacts.length} Artifacts
-        </Badge>
-      </div>
+    <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
+      <SectionHeader title="Artifact Explorer" subtitle={`${mockArtifacts.length} artifacts across all phases`} />
 
-      {/* Controls */}
-      <Card glow="emerald">
-        <SectionHeader title="Load Artifacts" subtitle="Enter run ID" icon={<FileText className="w-4 h-4" />} />
-        <div className="flex items-center gap-3">
+      {/* Search */}
+      <div className="card p-3">
+        <div className="flex items-center gap-2">
+          <Search className="w-3.5 h-3.5 text-zinc-600" />
           <input
             type="text"
-            value={runIdInput}
-            onChange={(e) => setRunIdInput(e.target.value)}
-            placeholder="Run ID"
-            className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-emerald-500/50"
+            placeholder="Search artifacts by name, type, or agent..."
+            className="flex-1 bg-transparent text-xs text-zinc-300 placeholder-zinc-700 outline-none"
           />
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-emerald-500/50"
-          >
-            <option value="">All Types</option>
-            {artifactTypes.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <button
-            onClick={handleLoad}
-            disabled={loading || !runIdInput.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-md text-emerald-400 text-xs font-mono font-medium hover:bg-emerald-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-            {loading ? 'Loading...' : 'Load'}
-          </button>
         </div>
-      </Card>
+      </div>
 
-      {/* Metrics */}
-      {artifacts.length > 0 && (
-        <div className="grid grid-cols-4 gap-4">
-          <Card>
-            <Metric label="Total" value={artifacts.length} color="text-zinc-200" />
-          </Card>
-          <Card>
-            <Metric label="Types" value={artifactTypes.length} color="text-blue-400" />
-          </Card>
-          <Card>
-            <Metric label="Locked" value={artifacts.filter((a) => a.locked).length} color="text-amber-400" />
-          </Card>
-          <Card>
-            <Metric label="With Hash" value={artifacts.filter((a) => a.hash).length} color="text-emerald-400" />
-          </Card>
-        </div>
-      )}
-
-      {/* Artifact List */}
-      {filteredArtifacts.length > 0 && (
-        <Card>
-          <SectionHeader title="Artifacts" subtitle={`${filteredArtifacts.length} artifacts`} icon={<Package className="w-4 h-4" />} />
-          <div className="space-y-2">
-            {filteredArtifacts.map((artifact) => (
-              <div key={artifact.id} className="border border-zinc-800 rounded-md overflow-hidden">
-                <div
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 cursor-pointer"
-                  onClick={() => handleViewContent(artifact.id)}
-                >
-                  <Badge variant="zinc" size="sm">{artifact.type}</Badge>
-                  <span className="text-xs font-mono text-zinc-200 flex-1">{artifact.name}</span>
-                  {artifact.locked ? (
-                    <Lock className="w-3 h-3 text-amber-400" />
-                  ) : (
-                    <Unlock className="w-3 h-3 text-zinc-600" />
-                  )}
-                  {artifact.hash && (
-                    <span className="text-[9px] font-mono text-zinc-600 flex items-center gap-1">
-                      <Hash className="w-3 h-3" />
-                      {artifact.hash.slice(0, 8)}...
-                    </span>
-                  )}
-                  {loadingContent === artifact.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />
-                  ) : expandedArtifact === artifact.id ? (
-                    <ChevronUp className="w-3 h-3 text-zinc-500" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3 text-zinc-500" />
-                  )}
-                </div>
-                {expandedArtifact === artifact.id && artifactContent[artifact.id] && (
-                  <div className="px-4 py-3 bg-zinc-900/50 border-t border-zinc-800">
-                    <pre className="text-[10px] font-mono text-zinc-400 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                      {artifactContent[artifact.id]}
-                    </pre>
-                  </div>
-                )}
+      {/* Artifact list */}
+      <div className="card p-4">
+        <div className="space-y-1">
+          {mockArtifacts.map(art => (
+            <div key={art.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-zinc-800/20 border border-transparent hover:border-zinc-800/40 transition-colors">
+              <div className={`w-7 h-7 rounded flex items-center justify-center border ${typeColors[art.type]}`}>
+                {typeIcons[art.type]}
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Empty State */}
-      {artifacts.length === 0 && !loading && (
-        <div className="flex flex-col items-center justify-center py-16 text-zinc-600">
-          <FileText className="w-10 h-10 mb-3 opacity-20" />
-          <p className="text-xs font-mono">No artifacts loaded</p>
-          <p className="text-[10px] font-mono mt-1">Enter a run ID and click Load</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-medium text-zinc-300">{art.name}</span>
+                  <span className="text-[9px] text-zinc-700">v{art.version}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[9px] text-zinc-600">{art.phase}</span>
+                  <span className="text-[9px] text-zinc-700">•</span>
+                  <span className="text-[9px] text-zinc-600">{art.agent}</span>
+                  <span className="text-[9px] text-zinc-700">•</span>
+                  <span className="text-[9px] text-zinc-600">{(art.tokenCost / 1000).toFixed(1)}k tok</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-16">
+                  <ProgressBar value={art.confidence} size="sm" color={art.confidence >= 0.8 ? 'green' : art.confidence >= 0.5 ? 'amber' : 'red'} />
+                </div>
+                <span className="text-[9px] font-mono text-zinc-600 w-8 text-right">{Math.round(art.confidence * 100)}%</span>
+                <StatusChip status={art.status === 'accepted' ? 'verified' : art.status === 'tested' ? 'tested' : art.status === 'generated' ? 'generated' : 'pending'} size="sm" />
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -2,63 +2,60 @@
 
 import React from 'react';
 import { useStore } from '@/lib/store';
-import { StatusDot } from '@/components/ui/Card';
-import { Activity, Clock, GitBranch, Zap } from 'lucide-react';
-
-const roomLabels: Record<string, string> = {
-  'command-center': 'Command Center',
-  'spec-room': 'Specification Room',
-  'architecture-room': 'Architecture Room',
-  'governance-room': 'Governance Room',
-  'replay-chamber': 'Replay Chamber',
-};
+import { mockApplication, mockBuildRun, mockScores } from '@/lib/mock-data';
+import { Badge } from '@/components/ui/Badge';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Wifi, WifiOff, Bell } from 'lucide-react';
 
 export function TopBar() {
-  const activeRoom = useStore((s) => s.activeRoom);
-  const health = useStore((s) => s.health);
   const wsConnected = useStore((s) => s.wsConnected);
 
   return (
-    <header className="h-12 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-between px-6 flex-shrink-0">
+    <header className="h-11 border-b border-[#1e2230] bg-[#0a0b0f]/80 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
+      {/* Left: App info */}
       <div className="flex items-center gap-3">
-        <span className="text-[11px] font-mono text-zinc-400">
-          {roomLabels[activeRoom] || 'Unknown'}
-        </span>
-        <span className="text-zinc-700">/</span>
-        <span className="text-[10px] font-mono text-zinc-600">COGNITIVE CORTEX v1.0</span>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+          <span className="text-xs font-semibold text-zinc-200">{mockApplication.name}</span>
+          <Badge variant="violet" size="sm">v1.0</Badge>
+        </div>
+        <div className="h-3 w-px bg-zinc-800" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600">Run</span>
+          <span className="text-[10px] font-mono text-zinc-400">{mockBuildRun.id.slice(0, 12)}</span>
+        </div>
+        <div className="h-3 w-px bg-zinc-800" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-zinc-600">Progress</span>
+          <div className="w-20">
+            <ProgressBar value={mockScores.overloadProgress} size="sm" color="violet" />
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500">{Math.round(mockScores.overallProgress * 100)}%</span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-6">
-        {/* Runtime Health */}
-        <div className="flex items-center gap-2">
-          <StatusDot status={health?.status || 'inactive'} size="sm" pulse={health?.status === 'healthy'} />
-          <span className="text-[10px] font-mono text-zinc-500 uppercase">
-            {health?.status || 'Unknown'}
-          </span>
-        </div>
-
-        {/* WS */}
+      {/* Right: Status */}
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
-          <Activity className="w-3 h-3 text-zinc-600" />
-          <span className="text-[10px] font-mono text-zinc-600">
-            {wsConnected ? 'LIVE' : 'OFFLINE'}
+          {wsConnected ? (
+            <Wifi className="w-3 h-3 text-emerald-400" />
+          ) : (
+            <WifiOff className="w-3 h-3 text-red-400" />
+          )}
+          <span className="text-[9px] text-zinc-600 uppercase tracking-wider">
+            {wsConnected ? 'Live' : 'Offline'}
           </span>
         </div>
-
-        {/* Uptime */}
-        {health?.uptime_seconds && (
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3 text-zinc-600" />
-            <span className="text-[10px] font-mono text-zinc-600">
-              {Math.floor(health.uptime_seconds / 3600)}h {Math.floor((health.uptime_seconds % 3600) / 60)}m
-            </span>
+        <div className="h-3 w-px bg-zinc-800" />
+        <div className="flex items-center gap-1.5">
+          <Bell className="w-3 h-3 text-zinc-600" />
+          <span className="text-[9px] text-zinc-600">2</span>
+        </div>
+        <div className="h-3 w-px bg-zinc-800" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+            <span className="text-[8px] font-bold text-violet-400">M</span>
           </div>
-        )}
-
-        {/* Version */}
-        <div className="flex items-center gap-1.5">
-          <GitBranch className="w-3 h-3 text-zinc-600" />
-          <span className="text-[10px] font-mono text-zinc-600">{health?.version || '—'}</span>
         </div>
       </div>
     </header>
