@@ -19,7 +19,7 @@
 | **Logs Diagnostics** | LIVE | LIVE | `/logs` | Yes | Fully connected |
 | **Settings** | LIVE | LIVE | `/health`, `/cognitive/model-status` | Yes | Fully connected |
 | **Spec Room** | PARTIAL | **LIVE** | `/engines/specification/{id}/latest`, `/artifacts/by-run/{id}` | Yes | Upgraded — full spec data from backend |
-| **Tokenomics** | MOCK | **PARTIAL** | `/costs/report/{run_id}`, `/costs/events/{run_id}` | Yes | Real cost data, mock for waste autopsy |
+| Tokenomics | PARTIAL | **LIVE** | `/costs/report/{run_id}` (enhanced) | Yes (agent panel when no agent_id) | All primary panels backend-driven. Agent panel uses mock fallback when agent_id is null. |
 | **Build Map** | MOCK | **PARTIAL** | `/engines/architecture/{id}/latest`, `/pipeline/runs/{id}/semantic-graph`, `/artifacts/by-run/{id}` | Yes | Real architecture artifacts, parsed YAML |
 | **SDLC Navigator** | MOCK | **PARTIAL** | `/phases/by-run/{run_id}`, `/pipeline/runs/{id}/timeline` | Yes | Real phase data from backend |
 | **Process Timeline** | MOCK | **PARTIAL** | `/pipeline/runs/{id}/timeline`, `/phases/by-run/{run_id}` | Yes | Real timeline events from backend |

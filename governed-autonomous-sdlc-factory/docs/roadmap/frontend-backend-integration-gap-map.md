@@ -15,7 +15,7 @@ After Pass 2, all 18 screens have at least PARTIAL backend integration. No scree
 | # | Screen | Gap | Desired Endpoint | Priority |
 |---|---|---|---|---|
 | A1 | **Dashboard** | No single aggregated dashboard endpoint; metrics scattered across `/health`, `/cognitive/model-status`, `/runs` | `GET /dashboard/summary` with run status, integrity, coverage, cost, artifact count | High |
-| A2 | **Tokenomics** | No per-agent token breakdown; cost events exist but no aggregated per-agent view | `GET /costs/report/{run_id}` already exists but needs `by_agent` aggregation | High |
+| A2 | **Tokenomics** | ✅ Resolved — `by_agent` aggregation added to `/costs/report/{run_id}`. Tokenomics is now LIVE. Remaining: agent panel shows mock when agent_id is null in cost events. | Low |
 | A3 | **Build Map** | Architecture YAML is unstructured; no component topology endpoint | `GET /engines/architecture/{run_id}/graph` returning nodes/edges | Medium |
 | A4 | **Process Timeline** | No structured swimlane endpoint; timeline events exist but lack swimlane layout | `GET /pipeline/runs/{run_id}/swimlanes` | Medium |
 | A5 | **Agent Command** | No real-time agent activity stream; agents table exists but no live status | `GET /agents/activity` or WebSocket `/ws/agents` | Medium |
@@ -77,7 +77,7 @@ After Pass 2, all 18 screens have at least PARTIAL backend integration. No scree
 
 | Screen | Current | To LIVE | Required Change |
 |---|---|---|---|
-| Tokenomics | PARTIAL | LIVE | Add `by_agent` to cost report |
+| Tokenomics | **LIVE** | ✅ | Enhanced `/costs/report` with full aggregation |
 | Build Map | PARTIAL | LIVE | Add topology to architecture endpoint |
 | Dashboard | PARTIAL | LIVE | Add dashboard summary endpoint |
 | Executive Cockpit | PARTIAL | LIVE | Add executive summary endpoint |
