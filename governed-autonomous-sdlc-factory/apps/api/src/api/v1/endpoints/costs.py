@@ -170,7 +170,7 @@ async def get_cost_report(run_id: str, db: AsyncSession = Depends(get_db)):
             entry["error_count"] += 1
         entry["retry_count"] += mc.retry_count
 
-    # --- by_agent: resolve agent_id → agent name ---
+    # --- by_agent: resolve agent_id → agent name (or use agent_id as label) ---
     agent_ids = list(set(e.agent_id for e in events if e.agent_id))
     agent_name_map = {}
     if agent_ids:
@@ -178,10 +178,13 @@ async def get_cost_report(run_id: str, db: AsyncSession = Depends(get_db)):
         agent_name_map = {aid: name for aid, name in agent_result.all()}
 
     by_agent = {}
+    unattributed_tokens = 0
     for e in events:
-        if not e.agent_id:
+        if e.agent_id:
+            agent_key = agent_name_map.get(e.agent_id, e.agent_id)
+        else:
+            unattributed_tokens += e.tokens_in + e.tokens_out
             continue
-        agent_key = agent_name_map.get(e.agent_id, e.agent_id)
         if agent_key not in by_agent:
             by_agent[agent_key] = {
                 "key": agent_key, "label": agent_key,
@@ -196,9 +199,10 @@ async def get_cost_report(run_id: str, db: AsyncSession = Depends(get_db)):
         entry["cost"] += e.estimated_cost
 
     for mc in model_calls:
-        if not mc.agent_id:
+        if mc.agent_id:
+            agent_key = agent_name_map.get(mc.agent_id, mc.agent_id)
+        else:
             continue
-        agent_key = agent_name_map.get(mc.agent_id, mc.agent_id)
         if agent_key not in by_agent:
             by_agent[agent_key] = {
                 "key": agent_key, "label": agent_key,
@@ -211,6 +215,16 @@ async def get_cost_report(run_id: str, db: AsyncSession = Depends(get_db)):
         if not mc.is_success:
             entry["error_count"] += 1
         entry["retry_count"] += mc.retry_count
+
+    # Add unattributed entry if there are unattributed tokens
+    if unattributed_tokens > 0:
+        by_agent["unattributed"] = {
+            "key": "unattributed", "label": "Unattributed",
+            "input_tokens": 0, "output_tokens": 0, "total_tokens": unattributed_tokens,
+            "cost": 0.0, "call_count": 0, "error_count": 0, "retry_count": 0,
+            "percentage_of_total": round(unattributed_tokens / max(total_tokens, 1) * 100, 2),
+            "is_estimated": False,
+        }
 
     # --- Percentages ---
     for agg in [by_phase, by_model, by_provider, by_agent]:
@@ -245,6 +259,8 @@ async def get_cost_report(run_id: str, db: AsyncSession = Depends(get_db)):
     if not agent_ids and not any(mc.agent_id for mc in model_calls):
         missing_fields.append("agent")
         data_quality_warnings.append("No agent_id found in cost_events or model_calls; by_agent aggregation is empty")
+    elif unattributed_tokens > 0:
+        data_quality_warnings.append(f"{unattributed_tokens} tokens from events without agent_id; shown as 'Unattributed' in by_agent")
 
     if not events:
         data_quality_warnings.append("No cost events found for this run")

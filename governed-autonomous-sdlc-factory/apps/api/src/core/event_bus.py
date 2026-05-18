@@ -191,21 +191,28 @@ async def publish_artifact_created(run_id: str, artifact_name: str, artifact_typ
 
 
 async def publish_cost_event(run_id: str, model_name: str, tokens_in: int, tokens_out: int,
-                              cost: float, is_local: bool, data: dict = None):
-    """Publish a cost tracking event."""
+                              cost: float, is_local: bool, agent_id: str = None,
+                              phase_name: str = None, data: dict = None):
+    """Publish a cost tracking event with optional agent attribution."""
+    event_data = {
+        "model_name": model_name,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "cost": cost,
+        "is_local": is_local,
+        "message": f"Cost: ${cost:.4f} ({tokens_in + tokens_out} tokens, {model_name})",
+        **(data or {}),
+    }
+    if agent_id:
+        event_data["agent_id"] = agent_id
+    if phase_name:
+        event_data["phase_name"] = phase_name
     event = Event(
         type="cost.recorded",
         run_id=run_id,
         severity="info",
-        data={
-            "model_name": model_name,
-            "tokens_in": tokens_in,
-            "tokens_out": tokens_out,
-            "cost": cost,
-            "is_local": is_local,
-            "message": f"Cost: ${cost:.4f} ({tokens_in + tokens_out} tokens, {model_name})",
-            **(data or {}),
-        },
+        agent_id=agent_id,
+        data=event_data,
     )
     bus = EventBusManager.get_bus(run_id)
     await bus.publish(event)

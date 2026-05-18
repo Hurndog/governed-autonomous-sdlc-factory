@@ -212,6 +212,18 @@ class FullPipelineOrchestrator:
 
             metrics.cost_total += spec.cost_usd
             metrics.record_step("generate_specification", (time.monotonic() - t0) * 1000)
+            # Publish cost event with agent attribution
+            await publish_cost_event(
+                run_id=run_id,
+                model_name=spec.model_used or "unknown",
+                tokens_in=spec.tokens_used,
+                tokens_out=0,
+                cost=spec.cost_usd,
+                is_local=True,
+                agent_id="specification_engine",
+                phase_name="specification",
+                data={"spec_id": spec.id},
+            )
             await publish_custom_event(
                 run_id, "spec.generated",
                 f"Specification generated: {len(spec.functional_requirements)} FR, {len(spec.non_functional_requirements)} NFR",
@@ -291,6 +303,18 @@ class FullPipelineOrchestrator:
 
             metrics.cost_total += arch.cost_usd
             metrics.record_step("generate_architecture", (time.monotonic() - t0) * 1000)
+            # Publish cost event with agent attribution
+            await publish_cost_event(
+                run_id=run_id,
+                model_name=arch.model_used or "unknown",
+                tokens_in=arch.tokens_used,
+                tokens_out=0,
+                cost=arch.cost_usd,
+                is_local=True,
+                agent_id="architecture_engine",
+                phase_name="architecture",
+                data={"arch_id": arch.id},
+            )
             await publish_custom_event(
                 run_id, "architecture.generated",
                 f"Architecture generated: {len(arch.component_breakdown)} components, {len(arch.adrs)} ADRs",
@@ -465,6 +489,18 @@ class FullPipelineOrchestrator:
 
             metrics.cost_total += gov.cost_usd
             metrics.record_step("generate_governance", (time.monotonic() - t0) * 1000)
+            # Publish cost event with agent attribution
+            await publish_cost_event(
+                run_id=run_id,
+                model_name=gov.model_used or "unknown",
+                tokens_in=gov.tokens_used,
+                tokens_out=0,
+                cost=gov.cost_usd,
+                is_local=True,
+                agent_id="governance_engine",
+                phase_name="governance",
+                data={"gov_id": gov.id},
+            )
             await publish_custom_event(
                 run_id, "governance.generated",
                 f"Governance analysis: {len(gov.runtime_governance_concerns)} concerns, {len(gov.security_sensitive_findings)} security findings",
@@ -525,6 +561,18 @@ class FullPipelineOrchestrator:
 
             metrics.cost_total += test_plan.cost_usd
             metrics.record_step("generate_test_plan", (time.monotonic() - t0) * 1000)
+            # Publish cost event with agent attribution
+            await publish_cost_event(
+                run_id=run_id,
+                model_name=test_plan.model_used or "unknown",
+                tokens_in=test_plan.tokens_used,
+                tokens_out=0,
+                cost=test_plan.cost_usd,
+                is_local=True,
+                agent_id="test_engine",
+                phase_name="quality",
+                data={"test_plan_id": test_plan.id},
+            )
             await publish_custom_event(
                 run_id, "testplan.generated",
                 f"Test plan generated: {len(test_plan.test_cases)} test cases, {len(test_plan.edge_cases)} edge cases",
