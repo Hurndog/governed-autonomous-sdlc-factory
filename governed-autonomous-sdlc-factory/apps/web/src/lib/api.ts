@@ -154,6 +154,21 @@ export const api = {
   getCostEvents: (runId: string) => fetchJSON<CostEventsResponse>(`/costs/events/${runId}`),
   getCostReport: (runId: string) => fetchJSON<CostReportResponse>(`/costs/report/${runId}`),
 
+  // ─── Agents ───────────────────────────────────────────────────────
+  listAgents: (params?: { is_active?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.is_active !== undefined) q.set('is_active', String(params.is_active));
+    return fetchJSON<AgentsResponse>(`/agents?${q}`);
+  },
+  getAgent: (agentId: string) => fetchJSON<AgentDetail>(`/agents/${agentId}`),
+
+  // ─── Phases ───────────────────────────────────────────────────────
+  listPhasesByRun: (runId: string) => fetchJSON<PhasesResponse>(`/phases/by-run/${runId}`),
+  getPhase: (phaseId: string) => fetchJSON<PhaseDetail>(`/phases/${phaseId}`),
+
+  // ─── Tasks ────────────────────────────────────────────────────────
+  listTasksByPhase: (phaseId: string) => fetchJSON<TasksResponse>(`/tasks/by-phase/${phaseId}`),
+
   // ─── Snapshots ────────────────────────────────────────────────────
   getSnapshots: (runId: string) => fetchJSON<SnapshotsResponse>(`/engines/snapshots/${runId}`),
   createSnapshot: (runId: string, snapshotType?: string) => {
@@ -680,6 +695,70 @@ export interface SnapshotsResponse {
   snapshots: SnapshotItem[];
 }
 
+// ─── Agents ───────────────────────────────────────────────────────
+
+export interface AgentsResponse {
+  agents: AgentItem[];
+}
+
+export interface AgentItem {
+  id: string;
+  name: string;
+  role: string;
+  description?: string;
+  model_preference?: string;
+  max_retries: number;
+  is_active: boolean;
+  allowed_tools?: string[];
+  disallowed_tools?: string[];
+}
+
+export interface AgentDetail extends AgentItem {}
+
+// ─── Phases ───────────────────────────────────────────────────────
+
+export interface PhasesResponse {
+  phases: PhaseItem[];
+}
+
+export interface PhaseItem {
+  id: string;
+  run_id: string;
+  name: string;
+  order_index: number;
+  status: string;
+  agent_id?: string;
+  model_used?: string;
+  tokens_in?: number;
+  tokens_out?: number;
+  cost?: number;
+  error_message?: string;
+  created_at?: string;
+  completed_at?: string;
+}
+
+export interface PhaseDetail extends PhaseItem {}
+
+// ─── Tasks ────────────────────────────────────────────────────────
+
+export interface TasksResponse {
+  tasks: TaskItem[];
+}
+
+export interface TaskItem {
+  id: string;
+  phase_id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  requirement_ids?: string[];
+  acceptance_criteria_ids?: string[];
+  expected_artifacts?: string[];
+  test_ids?: string[];
+  governance_check_ids?: string[];
+  created_at?: string;
+}
+
 export interface ProjectsResponse {
   projects: ProjectItem[];
 }
@@ -700,3 +779,6 @@ export interface ProjectDetail {
   updated_at?: string;
   run_count?: number;
 }
+
+// Re-export semantic coverage types for convenience
+export type { SemanticCoverageSummary, SemanticCoverageReport } from '@/lib/types';

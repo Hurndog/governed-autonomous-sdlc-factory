@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 
-type StatusType = 'verified' | 'accepted' | 'tested' | 'active' | 'working' | 'warning' | 'blocked' | 'failed' | 'pending' | 'idle' | 'partial' | 'missing' | 'covered' | 'rejected' | 'approved' | 'escalated' | 'waived' | 'generated' | 'implemented' | 'in-progress' | 'waiting' | 'error' | 'paused';
+export type StatusType = 'verified' | 'accepted' | 'tested' | 'active' | 'working' | 'warning' | 'blocked' | 'failed' | 'pending' | 'idle' | 'partial' | 'missing' | 'covered' | 'rejected' | 'approved' | 'escalated' | 'waived' | 'generated' | 'implemented' | 'in-progress' | 'waiting' | 'error' | 'paused';
 
 interface StatusChipProps {
-  status: StatusType;
+  status: StatusType | string;
   className?: string;
   size?: 'sm' | 'md';
 }

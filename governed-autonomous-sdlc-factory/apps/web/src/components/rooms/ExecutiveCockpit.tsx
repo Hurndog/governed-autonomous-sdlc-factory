@@ -1,43 +1,178 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { GaugeChart } from '@/components/ui/GaugeChart';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
-import { mockScores, mockPhases, mockGovGates, mockTokenUsage, mockRequirements, mockHumanInterventions } from '@/lib/mock-data';
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Coins, Shield, Target, Zap } from 'lucide-react';
+import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
+import { api } from '@/lib/api';
+import { mockScores, mockGovGates, mockTokenUsage, mockRequirements, mockHumanInterventions } from '@/lib/mock-data';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Coins, Shield, RefreshCw } from 'lucide-react';
 
 export function ExecutiveCockpit() {
+  const [integrityScore, setIntegrityScore] = useState<number | null>(null);
+  const [semCovScore, setSemCovScore] = useState<number | null>(null);
+  const [totalCost, setTotalCost] = useState<number | null>(null);
+  const [artifactCount, setArtifactCount] = useState<number | null>(null);
+  const [evidenceCount, setEvidenceCount] = useState<number | null>(null);
+  const [govFindings, setGovFindings] = useState<number | null>(null);
+  const [traceabilityCoverage, setTraceabilityCoverage] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'LIVE' | 'PARTIAL' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
+
+  const fetchExecutiveData = async () => {
+    setLoading(true); setError(null);
+    try {
+      const runs = await api.listRuns({ page_size: 1 });
+      const latestRun = runs.items?.[0];
+      if (!latestRun) { setError('No runs found'); setDataSource('ERROR'); setLoading(false); return; }
+
+      const results = await Promise.allSettled([
+        api.getRunIntegrity(latestRun.id),
+        api.getSemanticCoverageSummary(latestRun.id),
+        api.getCostReport(latestRun.id),
+        api.listArtifacts(latestRun.id),
+        api.getEvidenceByRun(latestRun.id),
+        api.getGovernanceEvaluations(latestRun.id),
+        api.getTraceabilityCoverage(latestRun.id),
+      ]);
+
+      const [integrity, semCoverage, costReport, artifacts, evidence, governance, traceability] = results;
+      let successCount = 0;
+
+      if (integrity.status === 'fulfilled') {
+        const v = integrity.value as { integrity_score: number };
+        setIntegrityScore(v.integrity_score);
+        successCount++;
+      }
+      if (semCoverage.status === 'fulfilled') {
+        const v = semCoverage.value as { overall_semantic_coverage_score: number };
+        setSemCovScore(v.overall_semantic_coverage_score);
+        successCount++;
+      }
+      if (costReport.status === 'fulfilled') {
+        const v = costReport.value as { total_cost_usd: number };
+        setTotalCost(v.total_cost_usd);
+        successCount++;
+      }
+      if (artifacts.status === 'fulfilled') {
+        const v = artifacts.value as { total: number };
+        setArtifactCount(v.total);
+        successCount++;
+      }
+      if (evidence.status === 'fulfilled') {
+        const v = evidence.value as { bundles: unknown[] };
+        setEvidenceCount(v.bundles?.length ?? 0);
+        successCount++;
+      }
+      if (governance.status === 'fulfilled') {
+        const v = governance.value as { evaluations: unknown[] };
+        setGovFindings(v.evaluations?.length ?? 0);
+        successCount++;
+      }
+      if (traceability.status === 'fulfilled') {
+        const v = traceability.value as { coverage_pct: number };
+        setTraceabilityCoverage(v.coverage_pct);
+        successCount++;
+      }
+
+      setDataSource(successCount >= 3 ? 'PARTIAL' : successCount >= 1 ? 'PARTIAL' : 'MOCK');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch executive data');
+      setDataSource('ERROR');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchExecutiveData(); }, []);
+
   const failedGates = mockGovGates.filter(g => g.status === 'failed');
-  const criticalReqs = mockRequirements.filter(r => r.criticality === 'critical');
-  const coveredCritical = criticalReqs.filter(r => r.semanticCoverageScore >= 0.8);
+  const effectiveIntegrity = integrityScore ?? mockScores.integrityScore;
+  const effectiveSemCov = semCovScore ?? mockScores.semanticCoverage;
+  const effectiveCost = totalCost ?? mockTokenUsage.totalCostUsd;
+  const releaseReadiness = mockScores.releaseReadiness;
 
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
-      <SectionHeader title="Executive Cockpit" subtitle="Portfolio overview and delivery confidence" />
+      <DataSourceBanner state={dataSource} message={error || undefined} />
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Executive Cockpit" subtitle="Portfolio overview and delivery confidence" />
+        <div className="flex items-center gap-2">
+          <DataSourceBadge state={dataSource} />
+          <button onClick={fetchExecutiveData} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-zinc-800/50 text-zinc-400 border border-zinc-700/50 text-[10px] hover:bg-zinc-700/50 disabled:opacity-50">
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
+      </div>
 
-      {/* Executive Narrative */}
       <div className="card-elevated p-5 border-l-2 border-l-violet-500/50">
         <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-2">Executive Narrative</div>
         <p className="text-[12px] text-zinc-300 leading-relaxed">
-          The application is <span className="text-violet-400 font-semibold">72% complete</span>. Core backend services are implemented, but release readiness is limited by <span className="text-amber-400 font-semibold">weak semantic coverage</span> in payment validation and <span className="text-red-400 font-semibold">missing negative tests</span> for authorization failure paths. Token burn is <span className="text-amber-400 font-semibold">above forecast</span> because the Architecture Agent regenerated the integration model three times after unresolved API ambiguity. Governance risk is <span className="text-amber-400 font-semibold">moderate</span>. Recommended action: resolve the API contract conflict before allowing further code generation.
+          The application is <span className="text-violet-400 font-semibold">{Math.round(releaseReadiness * 100)}% complete</span>.
+          {integrityScore !== null && <> Integrity score is <span className={effectiveIntegrity >= 0.8 ? 'text-emerald-400' : effectiveIntegrity >= 0.5 ? 'text-amber-400' : 'text-red-400'}>{Math.round(effectiveIntegrity * 100)}%</span>.</>}
+          {semCovScore !== null && <> Semantic coverage is <span className={effectiveSemCov >= 0.8 ? 'text-emerald-400' : effectiveSemCov >= 0.5 ? 'text-amber-400' : 'text-red-400'}>{Math.round(effectiveSemCov * 100)}%</span>.</>}
+          {dataSource === 'MOCK' && <span className="text-zinc-500"> (showing mock data — connect to a live run for real metrics)</span>}
+          {dataSource === 'PARTIAL' && <span className="text-zinc-500"> (partial live data — some metrics from backend, others from mock)</span>}
         </p>
       </div>
 
-      {/* Key Metrics */}
       <div className="grid grid-cols-5 gap-3">
         <div className="card p-4 flex flex-col items-center">
-          <GaugeChart value={mockScores.releaseReadiness} label="Release Ready" size="md" color={mockScores.releaseReadiness >= 0.8 ? 'green' : mockScores.releaseReadiness >= 0.5 ? 'amber' : 'red'} />
+          <GaugeChart value={releaseReadiness} label="Release Ready" size="md" color={releaseReadiness >= 0.8 ? 'green' : releaseReadiness >= 0.5 ? 'amber' : 'red'} />
         </div>
-        <MetricCard label="Value Delivered" value="72%" change="+8% this week" changeType="positive" icon={<TrendingUp className="w-3.5 h-3.5 text-emerald-400" />} />
-        <MetricCard label="Cost to Date" value={`$${mockTokenUsage.totalCostUsd.toFixed(2)}`} change={`$${mockTokenUsage.budgetRemaining.toFixed(2)} remaining`} changeType="neutral" icon={<Coins className="w-3.5 h-3.5" />} />
-        <MetricCard label="Risk Posture" value="Moderate" change={`${failedGates.length} gates failed`} changeType="warning" icon={<Shield className="w-3.5 h-3.5 text-amber-400" />} />
+        <MetricCard label="Value Delivered" value={`${Math.round(releaseReadiness * 100)}%`} change="+8% this week" changeType="positive" icon={<TrendingUp className="w-3.5 h-3.5 text-emerald-400" />} />
+        <MetricCard label="Cost to Date" value={`$${effectiveCost.toFixed(2)}`} change="From backend" changeType="neutral" icon={<Coins className="w-3.5 h-3.5" />} />
+        <MetricCard label="Risk Posture" value={failedGates.length > 0 ? 'Moderate' : 'Low'} change={`${failedGates.length} gates failed`} changeType={failedGates.length > 0 ? 'warning' : 'positive'} icon={<Shield className="w-3.5 h-3.5 text-amber-400" />} />
         <MetricCard label="Interventions" value={mockHumanInterventions.length.toString()} change="4 human actions" changeType="neutral" icon={<Clock className="w-3.5 h-3.5" />} />
       </div>
 
-      {/* Trend Charts */}
+      {dataSource === 'PARTIAL' && (
+        <div className="card p-4">
+          <SectionHeader title="Live Run Metrics" subtitle="Aggregated from backend endpoints" />
+          <div className="grid grid-cols-6 gap-3 mt-2">
+            {artifactCount !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Artifacts</div>
+                <div className="text-sm font-semibold text-zinc-300">{artifactCount}</div>
+              </div>
+            )}
+            {evidenceCount !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Evidence</div>
+                <div className="text-sm font-semibold text-zinc-300">{evidenceCount}</div>
+              </div>
+            )}
+            {govFindings !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Gov Findings</div>
+                <div className="text-sm font-semibold text-zinc-300">{govFindings}</div>
+              </div>
+            )}
+            {traceabilityCoverage !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Traceability</div>
+                <div className="text-sm font-semibold text-zinc-300">{Math.round(traceabilityCoverage)}%</div>
+              </div>
+            )}
+            {integrityScore !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Integrity</div>
+                <div className={`text-sm font-semibold ${effectiveIntegrity >= 0.8 ? 'text-emerald-400' : 'text-amber-400'}`}>{Math.round(effectiveIntegrity * 100)}%</div>
+              </div>
+            )}
+            {semCovScore !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Sem Coverage</div>
+                <div className={`text-sm font-semibold ${effectiveSemCov >= 0.8 ? 'text-emerald-400' : 'text-amber-400'}`}>{Math.round(effectiveSemCov * 100)}%</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-4">
         <div className="card p-4">
           <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Release Readiness Trend</div>
@@ -54,7 +189,6 @@ export function ExecutiveCockpit() {
             <span className="text-[9px] text-red-400">-10% this week (semantic coverage drop)</span>
           </div>
         </div>
-
         <div className="card p-4">
           <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Semantic Coverage Trend</div>
           <div className="flex items-end gap-1 h-20">
@@ -67,10 +201,9 @@ export function ExecutiveCockpit() {
           </div>
           <div className="flex items-center gap-1 mt-2">
             <TrendingDown className="w-3 h-3 text-red-400" />
-            <span className="text-[9px] text-red-400">-16% this week (new requirements added)</span>
+            <span className="text-[9px] text-red-400">-16% this week</span>
           </div>
         </div>
-
         <div className="card p-4">
           <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Token Efficiency</div>
           <div className="flex items-end gap-1 h-20">
@@ -88,34 +221,30 @@ export function ExecutiveCockpit() {
         </div>
       </div>
 
-      {/* Risk Distribution */}
       <div className="grid grid-cols-2 gap-4">
         <div className="card p-4">
           <SectionHeader title="Risk Distribution" subtitle="By category" />
           <div className="space-y-2 mt-2">
             {[
-              { label: 'Semantic Coverage', value: 0.34, count: 3, color: 'red' },
-              { label: 'Security', value: 0.15, count: 1, color: 'amber' },
-              { label: 'Architecture Drift', value: 0.22, count: 2, color: 'amber' },
-              { label: 'Token Budget', value: 0.05, count: 0, color: 'green' },
-              { label: 'Test Coverage', value: 0.24, count: 2, color: 'amber' },
+              { label: 'Semantic Coverage', value: 0.34, count: 3, color: 'red' as const },
+              { label: 'Security', value: 0.15, count: 1, color: 'amber' as const },
+              { label: 'Architecture Drift', value: 0.22, count: 2, color: 'amber' as const },
+              { label: 'Token Budget', value: 0.05, count: 0, color: 'green' as const },
+              { label: 'Test Coverage', value: 0.24, count: 2, color: 'amber' as const },
             ].map(r => (
               <div key={r.label} className="flex items-center gap-2">
                 <span className="text-[10px] text-zinc-500 w-32 flex-shrink-0">{r.label}</span>
-                <div className="flex-1">
-                  <ProgressBar value={r.value} size="sm" color={r.color === 'red' ? 'red' : r.color === 'amber' ? 'amber' : 'green'} />
-                </div>
+                <div className="flex-1"><ProgressBar value={r.value} size="sm" color={r.color === 'red' ? 'red' : r.color === 'amber' ? 'amber' : 'green'} /></div>
                 <span className="text-[10px] font-mono text-zinc-600 w-6 text-right">{r.count}</span>
               </div>
             ))}
           </div>
         </div>
-
         <div className="card p-4">
           <SectionHeader title="Blocked Initiatives" subtitle="Requiring attention" />
           <div className="space-y-2 mt-2">
             {[
-              { title: 'Fraud Detection Service', reason: 'ML model integration blocked — missing training data pipeline', impact: 'high' },
+              { title: 'Fraud Detection Service', reason: 'ML model integration blocked', impact: 'high' },
               { title: 'Transaction Dashboard', reason: 'Depends on fraud service completion', impact: 'medium' },
               { title: 'Release Gate', reason: 'Semantic coverage below 80% threshold', impact: 'critical' },
             ].map((b, i) => (
