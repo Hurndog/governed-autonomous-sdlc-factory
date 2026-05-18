@@ -54,8 +54,8 @@ export function ExecutiveCockpit() {
         successCount++;
       }
       if (costReport.status === 'fulfilled') {
-        const v = costReport.value as { total_cost_usd: number };
-        setTotalCost(v.total_cost_usd);
+        const v = costReport.value as { total_cost: number };
+        setTotalCost(v.total_cost);
         successCount++;
       }
       if (artifacts.status === 'fulfilled') {

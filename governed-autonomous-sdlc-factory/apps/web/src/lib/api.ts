@@ -682,12 +682,55 @@ export interface CostEvent {
   timestamp: string;
 }
 
+export interface CostAggregationItem {
+  key: string;
+  label: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost: number;
+  call_count: number;
+  error_count: number;
+  retry_count: number;
+  percentage_of_total: number;
+  is_estimated: boolean;
+}
+
+export interface CostWasteSummary {
+  retry_tokens: number;
+  failed_call_tokens: number;
+  oversized_prompt_tokens: number | null;
+  unused_context_tokens: number | null;
+  unknown_waste_tokens: number | null;
+  notes: string;
+}
+
 export interface CostReportResponse {
   run_id: string;
+  generated_at: string;
+  aggregation_confidence: string;
+  total_cost: number;
   total_tokens: number;
-  total_cost_usd: number;
-  by_provider: Record<string, { tokens: number; cost_usd: number }>;
-  by_model: Record<string, { tokens: number; cost_usd: number }>;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_calls: number;
+  total_errors: number;
+  total_retries: number;
+  budget_limit: number | null;
+  remaining_budget: number | null;
+  warning_threshold: number;
+  is_near_limit: boolean;
+  is_hard_limit_reached: boolean;
+  local_cost: number;
+  paid_cost: number;
+  estimated_savings: number;
+  by_phase: Record<string, CostAggregationItem>;
+  by_model: Record<string, CostAggregationItem>;
+  by_provider: Record<string, CostAggregationItem>;
+  by_agent: Record<string, CostAggregationItem>;
+  waste_summary: CostWasteSummary;
+  missing_fields: string[];
+  data_quality_warnings: string[];
 }
 
 export interface SnapshotsResponse {
