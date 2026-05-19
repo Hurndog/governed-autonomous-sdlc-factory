@@ -272,28 +272,64 @@ class SafetyGuard:
         return None
 
     def _check_semantic_iteration_limit(self) -> Optional[GuardStatus]:
+        """Check semantic iteration stall — NOT a hard cap.
+        
+        The runtime should converge long before hitting this limit.
+        This guard detects stalls, not normal operation.
+        """
         if self.semantic_iterations >= settings.max_semantic_iterations:
             return self._activate(
                 GuardStatus.STOPPED_BY_SEMANTIC_ITERATION_LIMIT,
                 guard_name="semantic_iteration_limit",
                 limit=str(settings.max_semantic_iterations),
                 observed=str(self.semantic_iterations),
-                message=f"Semantic refinement exceeded {settings.max_semantic_iterations} iterations",
+                message=f"Semantic refinement stalled after {self.semantic_iterations} iterations without convergence",
                 recoverable=True,
             )
         return None
 
     def _check_mutation_iteration_limit(self) -> Optional[GuardStatus]:
+        """Check mutation iteration stall — NOT a hard cap.
+        
+        The runtime should converge long before hitting this limit.
+        This guard detects stalls, not normal operation.
+        """
         if self.mutation_iterations >= settings.max_mutation_iterations:
             return self._activate(
                 GuardStatus.STOPPED_BY_MUTATION_ITERATION_LIMIT,
                 guard_name="mutation_iteration_limit",
                 limit=str(settings.max_mutation_iterations),
                 observed=str(self.mutation_iterations),
-                message=f"Mutation testing exceeded {settings.max_mutation_iterations} iterations",
+                message=f"Mutation testing stalled after {self.mutation_iterations} iterations without convergence",
                 recoverable=True,
             )
         return None
+
+    def check_convergence(self, current_score: float, score_history: list) -> bool:
+        """Check if semantic/mutation convergence has been achieved.
+        
+        Returns True if the runtime should stop because further iterations
+        are unlikely to improve the score.
+        """
+        if len(score_history) < settings.semantic_convergence_window:
+            return False
+        recent = score_history[-settings.semantic_convergence_window:]
+        if max(recent) - min(recent) < (1.0 - settings.semantic_convergence_threshold):
+            return True
+        return False
+
+    def check_progress(self, current_state: dict, previous_state: dict) -> bool:
+        """Check if progress is being made.
+        
+        Returns True if the runtime is stalled (no meaningful progress).
+        """
+        if not previous_state:
+            return True
+        # Compare key metrics — if nothing changed, we're stalled
+        for key in current_state:
+            if current_state.get(key) != previous_state.get(key):
+                return True
+        return False
 
     def _activate(
         self,

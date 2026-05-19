@@ -3,6 +3,7 @@
 Updated to use the new cognitive execution engines (ModelRouter-based).
 Legacy endpoints are preserved for backward compatibility.
 """
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from src.models import (
     GovernancePolicy, GovernanceEvaluation, GovernanceReleaseGate,
     TestPlan, TraceabilityLink, RunSnapshot, Artifact
 )
+from src.core.models_semantic_coverage import SemanticCoverageReport
 from src.engines.specification_engine import SpecificationEngine
 from src.engines.architecture_engine import ArchitectureEngine
 from src.engines.governance_engine import GovernanceEngine
@@ -388,11 +390,164 @@ async def evaluate_release_gate(
     session: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Evaluate a release gate."""
-    return {"gate_id": gate_id, "status": "passed"}
+    """Evaluate a release gate using real semantic coverage, governance, mutation, and evidence data.
+
+    Deterministic gate logic:
+    - PASS: overall >= 0.5 AND critical_passed AND no failing governance AND mutation_score > 0 AND evidence_complete
+    - FAIL: any of the above conditions not met
+    """
+    # 1. Fetch the release gate
+    gate_result = await session.execute(
+        select(GovernanceReleaseGate).where(GovernanceReleaseGate.id == gate_id)
+    )
+    gate = gate_result.scalar_one_or_none()
+    if not gate:
+        raise HTTPException(status_code=404, detail=f"Release gate {gate_id} not found")
+
+    # 2. Fetch semantic coverage report
+    scr_result = await session.execute(
+        select(SemanticCoverageReport).where(SemanticCoverageReport.run_id == run_id)
+    )
+    scr = scr_result.scalar_one_or_none()
+
+    # 3. Fetch governance evaluations
+    gov_result = await session.execute(
+        select(GovernanceEvaluation).where(GovernanceEvaluation.run_id == run_id)
+    )
+    gov_evals = gov_result.scalars().all()
+
+    # 4. Fetch evidence count
+    evidence_result = await session.execute(
+        select(Artifact).where(Artifact.run_id == run_id)
+    )
+    evidence_count = len(evidence_result.scalars().all())
+
+    # 5. Determine gate status using deterministic logic
+    failure_reasons = []
+    failing_gov = []
+
+    if scr is None:
+        failure_reasons.append("No semantic coverage report for this run")
+        gate_status = "fail"
+    else:
+        # Check overall semantic coverage
+        if scr.overall_semantic_coverage_score < 0.5:
+            failure_reasons.append(
+                f"Overall semantic coverage {scr.overall_semantic_coverage_score:.2f} < 0.5"
+            )
+
+        # Check critical requirements
+        if not scr.critical_requirements_passed:
+            failure_reasons.append("Critical requirements not all passed")
+
+        # Check mutation score (must be > 0, meaning mutations were actually executed)
+        if scr.mutation_score <= 0.0:
+            failure_reasons.append("Mutation score is 0.0 — mutations not executed")
+
+        # Check evidence completeness
+        if evidence_count == 0:
+            failure_reasons.append("No evidence artifacts generated")
+
+        # Check governance evaluations — any failing policy fails the gate
+        failing_gov = [g for g in gov_evals if g.decision == "fail"]
+        if failing_gov:
+            for g in failing_gov:
+                failure_reasons.append(
+                    f"Governance policy {g.policy_id} failed"
+                )
+
+        # Check required policies from gate config
+        if gate.required_policy_ids:
+            evaluated_policy_ids = {g.policy_id for g in gov_evals}
+            missing_policies = set(gate.required_policy_ids) - evaluated_policy_ids
+            if missing_policies:
+                failure_reasons.append(
+                    f"Required policies not evaluated: {missing_policies}"
+                )
+
+        # Final determination
+        if failure_reasons:
+            gate_status = "fail"
+        else:
+            gate_status = "pass"
+
+    # 6. Persist the gate evaluation
+    gate.status = gate_status
+    gate.evaluated_at = datetime.now(timezone.utc)
+    gate.evaluation_ids = [str(g.id) for g in gov_evals]
+
+    # 7. Update semantic coverage report gate status
+    if scr is not None:
+        scr.release_gate_status = gate_status
+        scr.updated_at = datetime.now(timezone.utc)
+
+    await session.commit()
+
+    # 8. Build response
+    response = {
+        "gate_id": gate_id,
+        "run_id": run_id,
+        "status": gate_status,
+        "evaluated_at": gate.evaluated_at.isoformat() if gate.evaluated_at else None,
+        "semantic_coverage_score": scr.overall_semantic_coverage_score if scr else None,
+        "critical_requirements_passed": scr.critical_requirements_passed if scr else None,
+        "mutation_score": scr.mutation_score if scr else None,
+        "evidence_count": evidence_count,
+        "governance_evaluations": len(gov_evals),
+        "failing_governance": len(failing_gov),
+        "failure_reasons": failure_reasons if failure_reasons else None,
+    }
+
+    logger.info(
+        f"Release gate {gate_id} evaluated: {gate_status} — "
+        f"reasons: {failure_reasons if failure_reasons else 'none'}"
+    )
+
+    return response
 
 
-@router.post("/governance/release-gates/{run_id}/waive/{gate_id}")
+@router.post("/semantic-coverage/runs/{run_id}/execute-mutations")
+async def execute_mutations(
+    run_id: str,
+    user=Depends(get_current_user),
+):
+    """Execute planned mutation tests for a run.
+
+    Returns execution results including killed/survived counts and mutation score.
+    """
+    from src.engines.semantic_coverage_engine import SemanticCoverageEngine
+    from src.core.database import SyncSessionLocal
+
+    session = SyncSessionLocal()
+    try:
+        engine = SemanticCoverageEngine(session)
+        executed = engine.execute_mutation_tests(run_id)
+
+        killed = sum(1 for m in executed if m.killed)
+        survived = sum(1 for m in executed if m.survived)
+        total = killed + survived
+        score = killed / total if total > 0 else 0.0
+
+        return {
+            "run_id": run_id,
+            "mutations_executed": len(executed),
+            "mutations_killed": killed,
+            "mutations_survived": survived,
+            "mutation_score": round(score, 4),
+            "details": [
+                {
+                    "mutation_id": m.mutation_id,
+                    "mutation_type": m.mutation_type,
+                    "requirement_id": m.requirement_id,
+                    "result": m.actual_test_result,
+                    "killed": m.killed,
+                    "survived": m.survived,
+                }
+                for m in executed
+            ],
+        }
+    finally:
+        session.close()
 async def waive_release_gate(
     run_id: str,
     gate_id: str,

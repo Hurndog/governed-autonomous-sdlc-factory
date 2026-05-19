@@ -584,7 +584,185 @@ class SemanticCoverageEngine:
         self.db.commit()
         return mutations
 
-    # ─── 7. Negative Test Coverage ────────────────────────────────────────
+    # ─── 6b. Mutation Test Execution ───────────────────────────────────────
+
+    def execute_mutation_tests(self, run_id: str) -> List[MutationTest]:
+        """Execute planned mutation tests and record results.
+
+        For each planned mutation:
+        1. Load the test obligation code
+        2. Apply the mutation to the test
+        3. Run the mutated test
+        4. Record: killed (test failed as expected) or survived (test still passed)
+
+        Timeout: 30s per mutation, max 50 mutations per run.
+        """
+        import subprocess
+        import tempfile
+        import os as _os
+
+        MAX_MUTATIONS = 50
+        TIMEOUT_SECONDS = 30
+
+        rid = self._to_uuid(run_id)
+        planned = self.db.query(MutationTest).filter(
+            MutationTest.run_id == rid,
+            MutationTest.actual_test_result.is_(None),  # not yet executed
+        ).limit(MAX_MUTATIONS).all()
+
+        if not planned:
+            return []
+
+        # Load test obligations for context
+        obligations = self.db.query(TestObligation).filter(
+            TestObligation.run_id == rid
+        ).all()
+
+        # Build a mapping: requirement_id → test code
+        req_test_map = {}
+        for obl in obligations:
+            if obl.test_code and obl.requirement_id:
+                req_test_map[obl.requirement_id] = obl.test_code
+
+        executed = []
+        for mt in planned:
+            try:
+                # Get the test code for this requirement
+                test_code = req_test_map.get(mt.requirement_id, "")
+
+                if not test_code:
+                    # No test code available — mutation is "not applicable"
+                    mt.actual_test_result = "no_test"
+                    mt.killed = False
+                    mt.survived = False
+                    mt.mutation_score_impact = 0.0
+                    executed.append(mt)
+                    continue
+
+                # Apply mutation to test code
+                mutated_code = self._apply_mutation(test_code, mt.mutation_type)
+
+                if mutated_code is None:
+                    # Mutation type not applicable to this code
+                    mt.actual_test_result = "not_applicable"
+                    mt.killed = False
+                    mt.survived = False
+                    mt.mutation_score_impact = 0.0
+                    executed.append(mt)
+                    continue
+
+                # Write mutated test to temp file and execute
+                with tempfile.NamedTemporaryFile(
+                    mode='w', suffix='.py', delete=False, prefix=f'mut_{mt.mutation_id}_'
+                ) as tmp:
+                    tmp.write(mutated_code)
+                    tmp_path = tmp.name
+
+                try:
+                    result = subprocess.run(
+                        ['python', tmp_path],
+                        capture_output=True,
+                        text=True,
+                        timeout=TIMEOUT_SECONDS,
+                    )
+                    # If the mutated test still passes (exit code 0), the mutation survived
+                    # If the mutated test fails (non-zero exit), the mutation was killed
+                    if result.returncode == 0:
+                        mt.actual_test_result = "survived"
+                        mt.survived = True
+                        mt.killed = False
+                        mt.mutation_score_impact = 0.0  # weak test — mutation survived
+                    else:
+                        mt.actual_test_result = "killed"
+                        mt.killed = True
+                        mt.survived = False
+                        mt.mutation_score_impact = 1.0 / len(planned) if planned else 0.0
+                except subprocess.TimeoutExpired:
+                    mt.actual_test_result = "timeout"
+                    mt.killed = False
+                    mt.survived = False
+                    mt.mutation_score_impact = 0.0
+                except Exception as e:
+                    mt.actual_test_result = f"error: {str(e)[:100]}"
+                    mt.killed = False
+                    mt.survived = False
+                    mt.mutation_score_impact = 0.0
+                finally:
+                    # Clean up temp file
+                    try:
+                        _os.unlink(tmp_path)
+                    except Exception:
+                        pass
+
+            except Exception as e:
+                mt.actual_test_result = f"error: {str(e)[:100]}"
+                mt.killed = False
+                mt.survived = False
+                mt.mutation_score_impact = 0.0
+
+            executed.append(mt)
+
+        self.db.commit()
+        return executed
+
+    def _apply_mutation(self, code: str, mutation_type: str) -> Optional[str]:
+        """Apply a mutation to test code. Returns mutated code or None if not applicable.
+
+        Mutation types:
+        - boundary_shift: shift numeric literals by ±1
+        - null_injection: replace values with None
+        - type_confusion: swap int/str where possible
+        - logic_inversion: invert boolean literals and comparison operators
+        - off_by_one: change < to <=, > to >=, etc.
+        """
+        import re
+
+        if mutation_type == "logic_inversion":
+            # Invert boolean literals
+            mutated = code.replace("True", "TEMP_TRUE").replace("False", "True").replace("TEMP_TRUE", "False")
+            # Invert comparison operators
+            mutated = mutated.replace("==", "TEMP_EQ").replace("!=", "==").replace("TEMP_EQ", "!=")
+            mutated = mutated.replace("<", "TEMP_LT").replace(">=", "<").replace("TEMP_LT", ">=")
+            mutated = mutated.replace(">", "TEMP_GT").replace("<=", ">").replace("TEMP_GT", "<=")
+            return mutated
+
+        elif mutation_type == "boundary_shift":
+            # Shift numeric literals by +1
+            def shift_num(match):
+                try:
+                    val = int(match.group())
+                    return str(val + 1)
+                except ValueError:
+                    return match.group()
+            return re.sub(r'\b(\d+)\b', shift_num, code)
+
+        elif mutation_type == "null_injection":
+            # Replace common values with None
+            mutated = code.replace("== 0", "== None")
+            mutated = mutated.replace("== ''", "== None")
+            mutated = mutated.replace('== ""', "== None")
+            mutated = mutated.replace("== []", "== None")
+            mutated = mutated.replace("== {}", "== None")
+            return mutated if mutated != code else None  # None if no changes
+
+        elif mutation_type == "off_by_one":
+            # Change < to <=, > to >=
+            mutated = mutated = code.replace("< ", "<= ").replace("> ", ">= ")
+            mutated = mutated.replace("<=", "<").replace(">=", ">")  # reverse
+            # Actually, let's do it properly:
+            mutated = code
+            # Replace < with <= (but not <=)
+            mutated = re.sub(r'(?<=[^=])<(?!=)', '<=', mutated)
+            # Replace > with >= (but not >=)
+            mutated = re.sub(r'(?<=[^=])>(?!=)', '>=', mutated)
+            return mutated if mutated != code else None
+
+        elif mutation_type == "type_confusion":
+            # Swap int() with str() and vice versa
+            mutated = code.replace("int(", "TEMP_INT(").replace("str(", "int(").replace("TEMP_INT(", "str(")
+            return mutated if mutated != code else None
+
+        return None  # Unknown mutation type
 
     def evaluate_negative_test_coverage(self, run_id: str) -> List[NegativeTestRequirement]:
         """Evaluate negative test coverage from security findings and compliance gaps (idempotent)."""
@@ -742,10 +920,13 @@ class SemanticCoverageEngine:
         alignment_scores = [e.semantic_alignment_score for e in evaluations if e.status == "evaluated"]
         semantic_alignment = sum(alignment_scores) / max(len(alignment_scores), 1) if alignment_scores else 0.0
 
-        # 3. Mutation score: planned mutations (not executed — honest scoring)
-        # Since mutations are only planned, not executed, score is 0.0
-        # This is honest — we don't claim execution that didn't happen
-        mutation_score = 0.0
+        # 3. Mutation score: executed mutations
+        # Score = killed / (killed + survived) — what fraction of mutations were caught
+        executed_mutations = [m for m in mutations if m.actual_test_result is not None]
+        killed_count = sum(1 for m in executed_mutations if m.killed)
+        survived_count = sum(1 for m in executed_mutations if m.survived)
+        total_executed = killed_count + survived_count
+        mutation_score = killed_count / total_executed if total_executed > 0 else 0.0
 
         # 4. Negative coverage: % of security/governance requirements with negative tests
         sec_gov_reqs = [r for r in reqs if r.security_relevance or r.governance_relevance]
@@ -795,13 +976,15 @@ class SemanticCoverageEngine:
             "evaluations_count": len(evaluations),
             "critiques_count": len(critiques),
             "mutations_planned": len(mutations),
-            "mutations_executed": 0,
+            "mutations_executed": total_executed,
+            "mutations_killed": killed_count,
+            "mutations_survived": survived_count,
             "negative_requirements": len(neg_reqs),
             "evidence_bindings": len(bindings),
             "critical_requirements": len(critical_reqs),
             "critical_passed": critical_passed,
             "formula": "0.30*obligation + 0.25*alignment + 0.20*mutation + 0.10*negative + 0.10*evidence + 0.05*verifier",
-            "note": "mutations are planned but not executed — score is 0.0 for mutation component",
+            "note": "mutations are executed — score reflects killed/(killed+survived)",
         }
 
         # Deterministic upsert for report by natural key: run_id

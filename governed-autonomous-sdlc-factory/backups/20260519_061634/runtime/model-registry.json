@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-05-14T09:00:00+02:00",
+  "providers": {
+    "lm_studio": {
+      "endpoint": "http://localhost:1234",
+      "status": "online",
+      "models": [
+        {
+          "id": "google/gemma-4-e4b",
+          "name": "Gemma 4 E4B",
+          "parameter_size": "4B",
+          "quantization": "unknown",
+          "size_gb": null,
+          "context_length": null,
+          "capabilities": ["architecture_reasoning", "governance_reasoning", "specification_generation", "code_generation", "structured_output", "tool_calling"],
+          "recommended_roles": ["architecture_reasoning", "governance_reasoning", "specification_generation", "structured_output_generation"],
+          "json_output_format": "markdown_wrapped",
+          "vision": false,
+          "streaming": true
+        },
+        {
+          "id": "text-embedding-nomic-embed-text-v1.5",
+          "name": "nomic-embed-text-v1.5",
+          "type": "embeddings",
+          "capabilities": ["embeddings"]
+        }
+      ]
+    },
+    "ollama": {
+      "endpoint": "http://localhost:11434",
+      "status": "online",
+      "models": [
+        {
+          "name": "gpt-oss:20b",
+          "parameter_size": "20.9B",
+          "quantization": "MXFP4",
+          "size_gb": 13.8,
+          "context_length": 131072,
+          "capabilities": ["code_generation", "architecture_reasoning", "governance_reasoning", "long_form_cognition", "structured_output", "fallback_heavy_reasoning"],
+          "recommended_roles": ["fallback_heavy_reasoning", "long_generation", "second_opinion", "baseline_comparison"],
+          "json_output_format": "direct",
+          "vision": false,
+          "streaming": true
+        },
+        {
+          "name": "qwen2.5:1.5b",
+          "parameter_size": "1.5B",
+          "quantization": "Q4_K_M",
+          "size_gb": 1.0,
+          "context_length": 32768,
+          "capabilities": ["utility_tasks", "classification", "lightweight_inference", "metadata_extraction"],
+          "recommended_roles": ["utility", "classification", "metadata_extraction", "routing_decisions"],
+          "json_output_format": "direct",
+          "vision": false,
+          "streaming": true
+        },
+        {
+          "name": "phi3:mini",
+          "parameter_size": "3.8B",
+          "quantization": "Q4_0",
+          "size_gb": 2.2,
+          "context_length": 4096,
+          "capabilities": ["lightweight_inference", "utility_tasks"],
+          "recommended_roles": ["lightweight_background_checks"],
+          "json_output_format": "direct",
+          "vision": false,
+          "streaming": true
+        }
+      ]
+    }
+  },
+  "routing_policy": {
+    "architecture_reasoning": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "governance_reasoning": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "specification_generation": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "structured_output_generation": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "code_generation": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "tool_calling_tests": { "primary": "lm_studio/google/gemma-4-e4b", "fallback": "ollama/gpt-oss:20b" },
+    "fallback_heavy_reasoning": { "primary": "ollama/gpt-oss:20b", "fallback": "lm_studio/google/gemma-4-e4b" },
+    "long_generation": { "primary": "ollama/gpt-oss:20b", "fallback": "lm_studio/google/gemma-4-e4b" },
+    "second_opinion": { "primary": "ollama/gpt-oss:20b", "fallback": null },
+    "baseline_comparison": { "primary": "ollama/gpt-oss:20b", "fallback": null },
+    "utility_tasks": { "primary": "ollama/qwen2.5:1.5b", "fallback": "ollama/phi3:mini" },
+    "classification": { "primary": "ollama/qwen2.5:1.5b", "fallback": "ollama/phi3:mini" },
+    "metadata_extraction": { "primary": "ollama/qwen2.5:1.5b", "fallback": "ollama/phi3:mini" },
+    "routing_decisions": { "primary": "ollama/qwen2.5:1.5b", "fallback": null },
+    "embeddings": { "primary": "lm_studio/text-embedding-nomic-embed-text-v1.5", "fallback": null },
+    "lightweight_background_checks": { "primary": "ollama/phi3:mini", "fallback": null }
+  }
+}

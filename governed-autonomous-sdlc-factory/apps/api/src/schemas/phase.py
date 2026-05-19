@@ -122,7 +122,9 @@ class CostReportResponse(BaseModel):
     by_phase: Dict[str, float]
     by_agent: Dict[str, float]
     by_model: Dict[str, float]
-
+    by_provider: Dict[str, float]
+    missing_fields: List[str] = []
+    data_quality_warnings: List[str] = []
 
 # Log schemas
 class LogEventResponse(BaseModel):

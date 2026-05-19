@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-05-14T08:48:00+02:00",
+  "version": "1.0.0",
+  "status": "operational",
+  "repository": {
+    "path": "/Users/marcovanhurne/governed-autonomous-sdlc-factory/governed-autonomous-sdlc-factory",
+    "branch": "main",
+    "latest_commit": "fd462fc",
+    "total_commits": 8,
+    "remote_configured": false,
+    "github_token_available": false
+  },
+  "services": {
+    "api": {
+      "url": "http://localhost:8000",
+      "status": "running",
+      "routes": 94,
+      "pid": 29011
+    },
+    "frontend": {
+      "url": "http://localhost:3000",
+      "status": "running",
+      "framework": "Next.js 14",
+      "first_load_js_kb": 20.7
+    },
+    "ollama": {
+      "url": "http://localhost:11434",
+      "status": "online",
+      "models": 3
+    },
+    "lm_studio": {
+      "url": "http://localhost:1234",
+      "status": "server_off",
+      "app_running": true,
+      "requires_manual_activation": true
+    },
+    "database": {
+      "url": "postgresql://localhost:5432/sdlc_factory",
+      "status": "online",
+      "tables": 57
+    }
+  },
+  "models": {
+    "total": 3,
+    "providers": 1,
+    "primary": "ollama/gpt-oss:20b",
+    "routing_policy": "configured"
+  },
+  "pipeline": {
+    "last_run_id": "ec21227c-db66-4059-b944-3b7fa3a25ae8",
+    "last_run_status": "completed",
+    "last_run_duration_ms": 181777,
+    "total_artifacts": 12,
+    "integrity_score": 0.5,
+    "replay_tested": true
+  },
+  "blockers": [
+    "GitHub token required for remote push",
+    "LM Studio Local Server requires manual GUI activation",
+    "OpenAI/Anthropic keys not configured (optional)"
+  ],
+  "backup": {
+    "last_backup": "20260516_074806",
+    "backup_size": "1.4M",
+    "location": "backups/20260516_074806"
+  }
+}
