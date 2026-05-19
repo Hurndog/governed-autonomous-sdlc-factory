@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 # Set env vars BEFORE importing anything that depends on settings
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests-32bytes!")
 os.environ.setdefault("ALLOW_BOOTSTRAP", "true")
 
 from src.core.auth import hash_password, create_access_token, Role, verify_password
@@ -85,7 +85,7 @@ def test_decode_expired_token():
         "iat": datetime.now(timezone.utc) - timedelta(hours=48),
         "exp": datetime.now(timezone.utc) - timedelta(hours=24),
     }
-    expired_token = pyjwt.encode(payload, "test-secret-key-for-tests", algorithm="HS256")
+    expired_token = pyjwt.encode(payload, "test-secret-key-for-tests-32bytes!", algorithm="HS256")
     with pytest.raises(Exception) as exc_info:
         decode_token(expired_token)
     assert "expired" in str(exc_info.value).lower() or "401" in str(exc_info.value)

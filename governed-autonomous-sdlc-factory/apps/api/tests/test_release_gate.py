@@ -15,7 +15,7 @@ from uuid import uuid4
 from datetime import datetime, timezone
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-tests-32bytes!")
 os.environ.setdefault("ALLOW_BOOTSTRAP", "true")
 
 

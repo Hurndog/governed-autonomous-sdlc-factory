@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256")
     jwt_expiry_minutes: int = Field(default=60)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Validate JWT secret length at startup
+        if len(self.jwt_secret.encode('utf-8')) < 32:
+            raise ValueError(
+                f"JWT secret must be at least 32 bytes, got {len(self.jwt_secret.encode('utf-8'))}. "
+                f"Set JWT_SECRET env var to a secure value."
+            )
+
     # GitHub
     github_token: Optional[str] = Field(default=None)
     github_owner: Optional[str] = Field(default=None)

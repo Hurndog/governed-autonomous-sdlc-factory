@@ -30,6 +30,26 @@ sync_engine = create_engine(_sync_url, **_sync_engine_kwargs)
 SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False)
 
 
+def init_sync_db():
+    """Run sync database migrations (for sync engine startup)."""
+    from sqlalchemy import text
+    with sync_engine.begin() as conn:
+        # Migration: add workspace_id to projects if not exists
+        try:
+            conn.execute(text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(36) REFERENCES workspaces(id)"
+            ))
+        except Exception:
+            pass
+        # Migration: add workspace_id to runs if not exists
+        try:
+            conn.execute(text(
+                "ALTER TABLE runs ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(36) REFERENCES workspaces(id)"
+            ))
+        except Exception:
+            pass
+
+
 async def get_db() -> AsyncSession:
     async with async_session_factory() as session:
         try:
