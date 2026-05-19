@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/ui/Sidebar';
 import { TopBar } from '@/components/ui/TopBar';
 import { useStore } from '@/lib/store';
 import { useWebSocket } from '@/lib/useWebSocket';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/lib/authStore';
 import { Dashboard } from '@/components/rooms/Dashboard';
 import { BuildMap } from '@/components/rooms/BuildMap';
 import { SDLCNavigator } from '@/components/rooms/SDLCNavigator';
@@ -26,8 +27,39 @@ import { LogsDiagnostics } from '@/components/rooms/LogsDiagnostics';
 import { IntegrityRoom } from '@/components/rooms/IntegrityRoom';
 import { TraceabilityRoom } from '@/components/rooms/TraceabilityRoom';
 import { RunControlRoom } from '@/components/rooms/RunControlRoom';
+import { UserManagement } from '@/components/rooms/UserManagement';
+import LoginPage from './login/page';
+import { Loader2 } from 'lucide-react';
 
 export default function Home() {
+  const { user, token, loading, checkSession } = useAuthStore();
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    checkSession().finally(() => setChecked(true));
+  }, [checkSession]);
+
+  // Show loading state
+  if (!checked || loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0b0f] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-zinc-500">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login
+  if (!token || !user) {
+    return <LoginPage />;
+  }
+
+  return <AuthenticatedApp />;
+}
+
+function AuthenticatedApp() {
   const activeRoom = useStore((s) => s.activeRoom);
   const setHealth = useStore((s) => s.setHealth);
   const setModelStatus = useStore((s) => s.setModelStatus);
@@ -76,6 +108,7 @@ export default function Home() {
       case 'integrity-room': return <IntegrityRoom />;
       case 'traceability-room': return <TraceabilityRoom />;
       case 'run-control': return <RunControlRoom />;
+      case 'user-management': return <UserManagement />;
       default: return <Dashboard />;
     }
   };

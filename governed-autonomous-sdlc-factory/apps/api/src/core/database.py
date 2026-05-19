@@ -5,13 +5,14 @@ from sqlalchemy.orm import sessionmaker
 from src.core.config import settings
 from src.models import Base
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-)
+_is_sqlite = "sqlite" in settings.database_url
+
+_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+if not _is_sqlite:
+    _engine_kwargs["pool_size"] = 10
+    _engine_kwargs["max_overflow"] = 20
+
+engine = create_async_engine(settings.database_url, **_engine_kwargs)
 
 async_session_factory = async_sessionmaker(
     engine,
@@ -21,13 +22,11 @@ async_session_factory = async_sessionmaker(
 
 # Sync engine for operations that require synchronous SQLAlchemy (integrity, semantic coverage)
 _sync_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://").replace("postgresql+asyncpg", "postgresql+psycopg2")
-sync_engine = create_engine(
-    _sync_url,
-    echo=False,
-    pool_size=5,
-    max_overflow=10,
-    pool_pre_ping=True,
-)
+_sync_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+if "sqlite" not in _sync_url:
+    _sync_engine_kwargs["pool_size"] = 5
+    _sync_engine_kwargs["max_overflow"] = 10
+sync_engine = create_engine(_sync_url, **_sync_engine_kwargs)
 SyncSessionLocal = sessionmaker(bind=sync_engine, expire_on_commit=False)
 
 
@@ -75,3 +74,11 @@ async def init_db():
             ))
         except Exception:
             pass  # Constraint may not exist
+        # Migration: add workspace_id to projects if not exists
+        try:
+            from sqlalchemy import text
+            await conn.execute(text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(36) REFERENCES workspaces(id)"
+            ))
+        except Exception:
+            pass

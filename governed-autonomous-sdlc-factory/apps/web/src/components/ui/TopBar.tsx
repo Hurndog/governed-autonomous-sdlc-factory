@@ -5,10 +5,12 @@ import { useStore } from '@/lib/store';
 import { mockApplication, mockBuildRun, mockScores } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { Wifi, WifiOff, Bell } from 'lucide-react';
+import { useAuthStore } from '@/lib/authStore';
+import { Wifi, WifiOff, Bell, LogOut, User } from 'lucide-react';
 
 export function TopBar() {
   const wsConnected = useStore((s) => s.wsConnected);
+  const { user, logout } = useAuthStore();
 
   return (
     <header className="h-11 border-b border-[#1e2230] bg-[#0a0b0f]/80 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
@@ -34,7 +36,7 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Right: Status */}
+      {/* Right: Status + User */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1.5">
           {wsConnected ? (
@@ -52,11 +54,29 @@ export function TopBar() {
           <span className="text-[9px] text-zinc-600">2</span>
         </div>
         <div className="h-3 w-px bg-zinc-800" />
-        <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
-            <span className="text-[8px] font-bold text-violet-400">M</span>
-          </div>
-        </div>
+
+        {/* User info */}
+        {user && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-violet-400">
+                  {user.display_name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-[9px] text-zinc-400 max-w-[80px] truncate">{user.display_name}</span>
+              <Badge variant="zinc" size="sm">{user.role}</Badge>
+            </div>
+            <div className="h-3 w-px bg-zinc-800" />
+            <button
+              onClick={logout}
+              className="flex items-center gap-1 text-[9px] text-zinc-500 hover:text-zinc-300 transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-3 h-3" />
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

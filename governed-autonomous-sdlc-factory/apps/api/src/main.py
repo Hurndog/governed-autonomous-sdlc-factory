@@ -11,6 +11,7 @@ from src.core.database import init_db
 from src.core.observability import get_prometheus_metrics
 from src.api.middleware.trace import TraceMiddleware
 from src.api.middleware.audit import AuditMiddleware
+from src.api.middleware.auth import AuthMiddleware
 from src.api.v1.router import api_router
 from src.websocket.run_events import ws_router
 
@@ -59,6 +60,7 @@ app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True
 # Custom middleware
 app.add_middleware(TraceMiddleware)
 app.add_middleware(AuditMiddleware)
+app.add_middleware(AuthMiddleware)
 
 # Include routers
 app.include_router(api_router)
