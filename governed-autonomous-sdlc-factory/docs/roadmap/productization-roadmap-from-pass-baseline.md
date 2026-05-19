@@ -1,9 +1,9 @@
 # Productization Roadmap — From PASS Baseline
 
-**Baseline Tag:** `v0.2.0-evidence-backed-runtime-pass`
-**Date:** 2026-05-14
+**Baseline Tag:** `v0.3-governed-runtime-observability-baseline`
+**Date:** 2026-05-19
 
-This roadmap defines the path from the current evidence-backed PASS baseline to a production-ready enterprise system. Each phase builds on the previous one. No phase should be skipped.
+This roadmap defines the path from the current v0.3 Governed Runtime Observability Baseline to a production-ready enterprise system. Phases 1-3 are complete. Phase 4 is the next target.
 
 ---
 

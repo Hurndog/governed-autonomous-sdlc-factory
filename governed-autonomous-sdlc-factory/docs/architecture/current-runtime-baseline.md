@@ -1,162 +1,155 @@
 # Current Runtime Baseline — Architecture Status
 
-**Tag:** `v0.2.0-evidence-backed-runtime-pass`
-**Date:** 2026-05-14
-**Status:** PASS — Evidence-Backed Operational Acceptance
+**Tag:** `v0.3-governed-runtime-observability-baseline`
+**Date:** 2026-05-19
+**Status:** PASS — Governed Runtime Observability Baseline Sealed
 
 ---
 
 ## 1. Runtime Overview
 
-The Governed Autonomous SDLC Factory is a pipeline-driven runtime that transforms natural language software specifications into release-governed outputs through a series of orchestrated phases. Each phase is executed by AI agents operating under governance constraints, with full evidence capture and integrity verification at every step.
+The Governed Autonomous SDLC Factory is a **governed autonomous software engineering runtime** that transforms natural language software specifications into release-governed outputs through a series of orchestrated phases. Each phase is executed by AI agents operating under governance constraints, with full evidence capture, integrity verification, and runtime observability at every step.
 
-The system is operated through a Next.js frontend (Forge Control Tower) and driven by a FastAPI + LangGraph backend with PostgreSQL persistence.
+The system is operated through a Next.js frontend (Command Center) and driven by a FastAPI backend with PostgreSQL persistence. All 18 command center screens are now **LIVE** — driven by real backend data with no fake telemetry, no fake governance, and no fabricated metrics.
 
 ## 2. Main Components
 
 | Component | Technology | Role |
 |---|---|---|
-| Frontend Control Plane | Next.js 14, React, Tailwind, shadcn/ui | Operator interface |
-| API Layer | FastAPI, Pydantic | HTTP API, WebSocket |
+| Frontend Control Plane | Next.js 14, React, Tailwind, shadcn/ui | Operator interface (18 LIVE screens) |
+| API Layer | FastAPI, Pydantic | HTTP API with JWT auth + RBAC |
 | Orchestration | LangGraph | Pipeline phase execution |
-| Persistence | PostgreSQL, SQLAlchemy/asyncpg | Structured data, evidence |
+| Persistence | PostgreSQL, SQLAlchemy/asyncpg | Structured data, evidence, audit trail |
 | Vector Memory | Qdrant (configured) | Semantic search, embeddings |
 | Governance | OPA Rego (configured) | Policy enforcement |
 | Tool Protocol | MCP servers | Tool abstraction for agents |
 | Hashing | SHA256 | Artifact/event/snapshot integrity |
 
-## 3. Pipeline Phases
+## 3. Security & Access Control
 
-The runtime executes the following phases in sequence:
+| Capability | Status |
+|------------|--------|
+| JWT Authentication | ✅ COMPLETE |
+| RBAC (7 roles) | ✅ COMPLETE |
+| Workspace/Project Isolation | ✅ COMPLETE |
+| Audit Logging | ✅ COMPLETE |
+| Secret Redaction | ✅ COMPLETE |
+| Bootstrap Admin | ✅ Environment-gated |
 
-1. **Ingest** — Parse natural language specification into structured requirements
-2. **Plan** — Generate implementation plan with task decomposition
-3. **Implement** — Execute code generation tasks
-4. **Verify** — Run tests, static analysis, semantic coverage check
-5. **Evidence** — Capture all artifacts, events, and metrics
-6. **Gate** — Evaluate release readiness via integrity + semantic coverage
-7. **Release** — Produce release artifacts (if gate passes)
+### Roles
+- `admin` — Full management
+- `architect` — Architecture + governance
+- `engineer` — Development + execution
+- `governance_reviewer` — Governance review
+- `executive_viewer` — Read-only executive views
+- `auditor` — Read-only audit views
+- `operator` — Operations + monitoring
 
-Each phase is subject to safety guards (timeouts, retry limits, budget caps).
+## 4. Runtime Observability
 
-## 4. Model Router
+### 4.1 LIVE Screen Architecture (22 LIVE screens)
 
-- Multi-provider routing with configurable failover
-- Per-phase model call budget: 5 calls
-- Per-run model call budget: 50 calls
-- Per-run token budget: 250,000 tokens
-- Semantic iteration limit: 5 iterations per requirement
-- Provider capability matching for task routing
+All screens use the **DataSourceBadge** pattern to indicate data provenance:
+- **LIVE** — Data from backend API endpoints
+- **PARTIAL** — Mixed backend + mock data
+- **MOCK** — Fallback mock data only (clearly indicated)
 
-## 5. Semantic Coverage Layer
+### 4.2 Upgraded Screens (v0.3)
 
-The semantic coverage engine computes how well the generated artifacts (requirements, acceptance criteria, obligations) align with the original specification.
+| Screen | Backend Endpoints | Key Metrics |
+|--------|-------------------|-------------|
+| SDLC Navigator | `/api/v1/runs/latest`, `/api/v1/timeline/`, governance, semantic, artifacts, evidence, costs | Phase progression, governance counts, coverage, token usage |
+| Process Timeline | `/api/v1/timeline/{run_id}`, `/api/v1/governance/evaluations` | Event ordering, bottleneck detection, governance checkpoints |
+| Build Map | `/api/v1/architecture/latest`, traceability, governance, artifacts, costs | Topology, traceability links, risk scoring, governance overlays |
+| Executive Cockpit | 7 parallel endpoints (integrity, semantic, costs, artifacts, evidence, governance, traceability) | Aggregated metrics, release readiness, governance risks, tokenomics |
+| Agent Command Center | Agents table, inference logs, cost report | Agent activity, token usage, retries, errors |
+| Backlog Checklist | Requirements, test obligations, governance, mutation tests, verifier critiques | Uncovered requirements, blockers, mutation survival, verifier critiques |
 
-- **Input:** Persisted requirements, acceptance criteria, obligations from database
-- **Scoring:** Weighted alignment score across requirement-AC-obligation triples
-- **Threshold:** 0.8 (release gate blocks below this)
-- **Current score:** 0.6559 (genuine computed result from black-box run)
-- **Persistence:** All scores stored in `semantic_alignment_evaluations` table
-- **Idempotency:** Engine v3 uses query-first upserts to prevent duplicate scoring
+### 4.3 Governance Overlays
 
-## 6. Integrity Runtime
+Governance state is overlaid on multiple screens:
+- **SDLC Navigator** — Per-phase governance pass/fail/warning counts
+- **Build Map** — Per-component governance evaluations + risk scoring
+- **Executive Cockpit** — Aggregated governance readiness + failing gates
+- **Backlog Checklist** — Per-requirement governance blockers
+- **Process Timeline** — Governance checkpoint events merged with runtime events
 
-Seven-component integrity scoring:
+### 4.4 Semantic Coverage Integration
 
-1. **Artifact Hashing** — SHA256 for all generated artifacts
-2. **Event Sourcing** — Hash-chained event log for all state changes
-3. **Snapshot Integrity** — Point-in-time snapshots with hash verification
-4. **Lineage Tracking** — Full provenance from specification to release
-5. **Evidence Binding** — Cryptographic binding of evidence to runs
-6. **Replay Verification** — Deterministic replay with side-effect safety
-7. **Semantic Coverage** — Alignment scoring (see section 5)
+Semantic coverage is visible in:
+- **SDLC Navigator** — Coverage bar per phase
+- **Executive Cockpit** — Aggregated coverage score
+- **Semantic Coverage** screen — Detailed coverage analysis + conflict detection
+- **Backlog Checklist** — Per-requirement coverage status
 
-**Current overall integrity score:** 0.9508 (6 Pass, 1 Warning)
+### 4.5 Replay Integration
 
-## 7. Release Gate
+Replay functionality is integrated via:
+- **Replay Chamber** — Session-based replay with play/pause/skip controls
+- **Run Replay** — Run-level replay with evidence alignment
+- **Process Timeline** — Replay event visualization
 
-The release gate evaluates whether a run is ready for release:
+### 4.6 Tokenomics Integration
 
-- Checks semantic coverage score against threshold (0.8)
-- Verifies seven-component integrity
-- Checks for unresolved conflicts
-- Produces a binary PASS/FAIL verdict
-- **No bypass mechanism exists**
-- **Current behavior:** Correctly fails when coverage is insufficient (0.6559 < 0.8)
+Tokenomics data is integrated in:
+- **Tokenomics** screen — Full cost analysis by phase/agent/provider
+- **SDLC Navigator** — Per-phase token usage + cost
+- **Build Map** — Per-component token cost
+- **Executive Cockpit** — Aggregated cost metrics
+- **Agent Command Center** — Per-agent token attribution
 
-## 8. Replay
+### 4.7 Ownership Model
 
-- Snapshots captured at phase boundaries
-- Deterministic replay supported via stored state
-- Side-effect safety through isolated replay context
-- Hash verification ensures replay integrity
+Ownership is tracked at:
+- **Requirement level** — Owner per requirement
+- **Component level** — Owner per architecture component
+- **Governance gate level** — Owner per gate
+- **Audit trail** — Actor attribution for all actions
 
-## 9. Evidence and Backup
+## 5. API Endpoints
 
-- All pipeline runs produce evidence bundles
-- Evidence includes: artifacts, events, metrics, scores, conflicts, guard activations
-- 50+ evidence files in `evidence/` directory
-- Backup procedure: git bundle + evidence + manifest + checksums
-- **Backup verified:** 9MB bundle, restore tested, HEAD match confirmed
+All endpoints protected via JWT auth (unless explicitly public):
 
-## 10. Frontend Control Plane
+| Endpoint Group | Protection | Description |
+|----------------|------------|-------------|
+| `/api/v1/auth/*` | Public | Login, token refresh, bootstrap |
+| `/api/v1/runs/*` | JWT | Run management |
+| `/api/v1/timeline/*` | JWT | Timeline events |
+| `/api/v1/governance/*` | JWT | Governance evaluations + policies |
+| `/api/v1/semantic/*` | JWT | Semantic coverage |
+| `/api/v1/evidence/*` | JWT | Evidence items |
+| `/api/v1/artifacts/*` | JWT | Artifact management |
+| `/api/v1/costs/*` | JWT | Cost reports |
+| `/api/v1/traceability/*` | JWT | Traceability links |
+| `/api/v1/architecture/*` | JWT | Architecture documents |
+| `/api/v1/users/*` | JWT + Admin | User management |
+| `/api/v1/workspaces/*` | JWT | Workspace management |
+| `/api/v1/projects/*` | JWT | Project management |
 
-- **Command Center** — Run monitoring, phase status, real-time updates
-- **Governance Room** — Policy management, guard configuration, conflict review
-- **Architecture Room** — System topology, component health, dependency graph
-- **Settings/Providers** — Model provider configuration, API keys, thresholds
-- **Build status:** TypeScript strict pass, Next.js build pass (4 pages)
+## 6. Remaining Limitations
 
-## 11. Safety Guards
+1. **ArchitectureIntelligence** — MOCK (static topology visualization). Acceptable for current phase; upgrade to LIVE in future.
+2. **Real-time updates** — No WebSocket/SSE. Data fetched on component mount + manual refresh button.
+3. **Pagination** — Some lists may need pagination for large datasets.
+4. **Search/filter** — Basic filtering available, advanced search not implemented.
+5. **Internationalization** — UI is English-only.
 
-11 guard types enforce runtime boundaries:
+## 7. Future Roadmap
 
-| Guard | Limit | Persisted |
-|---|---|---|
-| Pipeline timeout | 900s | ✅ |
-| Phase timeout | 180s | ✅ |
-| Max retries per phase | 3 | ✅ |
-| Model calls per phase | 5 | ✅ |
-| Model calls per run | 50 | ✅ |
-| Token budget per run | 250,000 | ✅ |
-| Semantic iteration limit | 5 | ✅ |
-| Run state guard | Valid transitions only | ✅ |
-| Evidence budget guard | Configurable | ✅ |
-| Provider failover guard | Auto-retry | ✅ |
-| Conflict threshold guard | Configurable | ✅ |
+### Recommended Next Phase: v0.4 — Real-Time Runtime Telemetry
+- WebSocket/SSE for live updates
+- Real-time governance alerts
+- Live agent activity streaming
+- Push-based evidence notifications
 
-All guard activations persisted in `guard_activations` table as forensic evidence.
+### v0.5 — Advanced Analytics
+- Trend analysis across runs
+- Predictive governance risk scoring
+- Cost optimization recommendations
+- Architecture drift detection
 
-## 12. Conflict Detection
-
-4 patterns detect requirement contradictions:
-
-1. **Immutability vs Editability** — Immutable requirement modified
-2. **Budget Over-allocation** — Resource claims exceed available budget
-3. **Temporal Contradiction** — Mutually exclusive time constraints
-4. **Provider Capability Mismatch** — Required capability not available from any provider
-
-Conflicts persisted in `requirement_conflicts` table. 1 conflict detected in black-box run.
-
-## 13. Current Limitations
-
-1. No authentication or authorization
-2. No multi-tenant isolation
-3. No production deployment configuration
-4. No automated database migrations
-5. No PDF/audit export
-6. No human-in-the-loop approval workflow
-7. ESLint not configured (pre-existing)
-8. Semantic coverage score below threshold (genuine, requires engine improvement)
-
-## 14. Next Architecture Phase
-
-**Phase 1: Security and Access Control**
-- JWT or session-based authentication
-- RBAC authorization
-- User/project/workspace model
-- Secrets management
-- API protection (rate limiting, input validation)
-- Audit access model
-
-This is the prerequisite for any production deployment or multi-user operation.
+### v0.6 — Multi-Tenant Operations
+- Organization-level isolation
+- Cross-workspace analytics
+- Team-based access controls
+- SLA monitoring

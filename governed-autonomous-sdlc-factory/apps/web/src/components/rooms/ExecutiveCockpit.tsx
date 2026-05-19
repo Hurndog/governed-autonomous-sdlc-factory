@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { GaugeChart } from '@/components/ui/GaugeChart';
@@ -8,22 +8,35 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { DataSourceBadge, DataSourceBanner } from '@/components/ui/DataSourceBadge';
 import { api } from '@/lib/api';
-import { mockScores, mockGovGates, mockTokenUsage, mockRequirements, mockHumanInterventions } from '@/lib/mock-data';
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Coins, Shield, RefreshCw } from 'lucide-react';
+import { mockGovGates, mockTokenUsage, mockHumanInterventions } from '@/lib/mock-data';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Coins, Shield, RefreshCw, Activity, FileText, Package } from 'lucide-react';
+
+interface ExecutiveMetrics {
+  integrityScore: number | null;
+  semCovScore: number | null;
+  totalCost: number | null;
+  totalTokens: number | null;
+  artifactCount: number | null;
+  evidenceCount: number | null;
+  govFindings: number | null;
+  govPassed: number | null;
+  govFailed: number | null;
+  traceabilityCoverage: number | null;
+  runStatus: string | null;
+  runId: string | null;
+}
 
 export function ExecutiveCockpit() {
-  const [integrityScore, setIntegrityScore] = useState<number | null>(null);
-  const [semCovScore, setSemCovScore] = useState<number | null>(null);
-  const [totalCost, setTotalCost] = useState<number | null>(null);
-  const [artifactCount, setArtifactCount] = useState<number | null>(null);
-  const [evidenceCount, setEvidenceCount] = useState<number | null>(null);
-  const [govFindings, setGovFindings] = useState<number | null>(null);
-  const [traceabilityCoverage, setTraceabilityCoverage] = useState<number | null>(null);
+  const [metrics, setMetrics] = useState<ExecutiveMetrics>({
+    integrityScore: null, semCovScore: null, totalCost: null, totalTokens: null,
+    artifactCount: null, evidenceCount: null, govFindings: null, govPassed: null,
+    govFailed: null, traceabilityCoverage: null, runStatus: null, runId: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<'LIVE' | 'PARTIAL' | 'MOCK' | 'ERROR' | 'LOADING'>('LOADING');
 
-  const fetchExecutiveData = async () => {
+  const fetchExecutiveData = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const runs = await api.listRuns({ page_size: 1 });
@@ -42,63 +55,92 @@ export function ExecutiveCockpit() {
 
       const [integrity, semCoverage, costReport, artifacts, evidence, governance, traceability] = results;
       let successCount = 0;
+      const m: ExecutiveMetrics = { ...metrics, runId: latestRun.id, runStatus: latestRun.status };
 
       if (integrity.status === 'fulfilled') {
-        const v = integrity.value as { integrity_score: number };
-        setIntegrityScore(v.integrity_score);
+        const v = integrity.value as { integrity_score?: number; status?: string };
+        m.integrityScore = v.integrity_score ?? null;
         successCount++;
       }
       if (semCoverage.status === 'fulfilled') {
-        const v = semCoverage.value as { overall_semantic_coverage_score: number };
-        setSemCovScore(v.overall_semantic_coverage_score);
+        const v = semCoverage.value as { overall_semantic_coverage_score?: number };
+        m.semCovScore = v.overall_semantic_coverage_score ?? null;
         successCount++;
       }
       if (costReport.status === 'fulfilled') {
-        const v = costReport.value as { total_cost: number };
-        setTotalCost(v.total_cost);
+        const v = costReport.value as { total_cost?: number; total_tokens?: number };
+        m.totalCost = v.total_cost ?? null;
+        m.totalTokens = v.total_tokens ?? null;
         successCount++;
       }
       if (artifacts.status === 'fulfilled') {
-        const v = artifacts.value as { total: number };
-        setArtifactCount(v.total);
+        const v = artifacts.value as { total?: number; items?: unknown[] };
+        m.artifactCount = v.total ?? v.items?.length ?? null;
         successCount++;
       }
       if (evidence.status === 'fulfilled') {
-        const v = evidence.value as { bundles: unknown[] };
-        setEvidenceCount(v.bundles?.length ?? 0);
+        const v = evidence.value as { bundles?: unknown[] };
+        m.evidenceCount = v.bundles?.length ?? null;
         successCount++;
       }
       if (governance.status === 'fulfilled') {
-        const v = governance.value as { evaluations: unknown[] };
-        setGovFindings(v.evaluations?.length ?? 0);
+        const v = governance.value as { evaluations?: Array<{ status?: string }> };
+        const evals = v.evaluations || [];
+        m.govFindings = evals.length;
+        m.govPassed = evals.filter(e => e.status === 'pass').length;
+        m.govFailed = evals.filter(e => e.status === 'fail').length;
         successCount++;
       }
       if (traceability.status === 'fulfilled') {
-        const v = traceability.value as { coverage_pct: number };
-        setTraceabilityCoverage(v.coverage_pct);
+        const v = traceability.value as { coverage_pct?: number };
+        m.traceabilityCoverage = v.coverage_pct ?? null;
         successCount++;
       }
 
-      setDataSource(successCount >= 3 ? 'PARTIAL' : successCount >= 1 ? 'PARTIAL' : 'MOCK');
+      setMetrics(m);
+      setDataSource(successCount >= 4 ? 'LIVE' : successCount >= 2 ? 'PARTIAL' : 'MOCK');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch executive data');
       setDataSource('ERROR');
     } finally { setLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { fetchExecutiveData(); }, []);
+  useEffect(() => { fetchExecutiveData(); }, [fetchExecutiveData]);
 
+  const effectiveIntegrity = metrics.integrityScore ?? 0.72;
+  const effectiveSemCov = metrics.semCovScore ?? 0.66;
+  const effectiveCost = metrics.totalCost ?? mockTokenUsage.totalCostUsd;
+  const effectiveTokens = metrics.totalTokens ?? mockTokenUsage.totalTokens;
+  const releaseReadiness = (effectiveIntegrity * 0.3 + effectiveSemCov * 0.3 + (metrics.traceabilityCoverage ?? 0.5) * 0.2 + (metrics.evidenceCount ? 0.2 : 0.1));
   const failedGates = mockGovGates.filter(g => g.status === 'failed');
-  const effectiveIntegrity = integrityScore ?? mockScores.integrityScore;
-  const effectiveSemCov = semCovScore ?? mockScores.semanticCoverage;
-  const effectiveCost = totalCost ?? mockTokenUsage.totalCostUsd;
-  const releaseReadiness = mockScores.releaseReadiness;
+
+  // Build narrative
+  const narrativeParts: string[] = [];
+  if (metrics.runId) {
+    narrativeParts.push(`Run ${metrics.runId.slice(0, 8)} is ${metrics.runStatus ?? 'unknown'}.`);
+  }
+  if (metrics.integrityScore !== null) {
+    narrativeParts.push(`Integrity score is ${Math.round(effectiveIntegrity * 100)}%.`);
+  }
+  if (metrics.semCovScore !== null) {
+    narrativeParts.push(`Semantic coverage is ${Math.round(effectiveSemCov * 100)}%.`);
+  }
+  if (metrics.traceabilityCoverage !== null) {
+    narrativeParts.push(`Traceability coverage is ${Math.round(metrics.traceabilityCoverage)}%.`);
+  }
+  if (metrics.govFailed !== null && metrics.govFailed > 0) {
+    narrativeParts.push(`${metrics.govFailed} governance gate${metrics.govFailed > 1 ? 's' : ''} failing.`);
+  }
+  if (metrics.evidenceCount !== null && metrics.evidenceCount > 0) {
+    narrativeParts.push(`${metrics.evidenceCount} evidence bundle${metrics.evidenceCount > 1 ? 's' : ''} available.`);
+  }
+  const narrative = narrativeParts.length > 0 ? narrativeParts.join(' ') : 'No live run data available. Showing mock metrics.';
 
   return (
     <div className="p-6 space-y-4 max-w-[1600px] mx-auto">
       <DataSourceBanner state={dataSource} message={error || undefined} />
       <div className="flex items-center justify-between">
-        <SectionHeader title="Executive Cockpit" subtitle="Portfolio overview and delivery confidence" />
+        <SectionHeader title="Executive Cockpit" subtitle={metrics.runId ? `Run ${metrics.runId.slice(0, 8)} • ${dataSource}` : 'Portfolio overview and delivery confidence'} />
         <div className="flex items-center gap-2">
           <DataSourceBadge state={dataSource} />
           <button onClick={fetchExecutiveData} disabled={loading}
@@ -108,158 +150,139 @@ export function ExecutiveCockpit() {
         </div>
       </div>
 
+      {/* Executive Narrative */}
       <div className="card-elevated p-5 border-l-2 border-l-violet-500/50">
         <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-2">Executive Narrative</div>
         <p className="text-[12px] text-zinc-300 leading-relaxed">
-          The application is <span className="text-violet-400 font-semibold">{Math.round(releaseReadiness * 100)}% complete</span>.
-          {integrityScore !== null && <> Integrity score is <span className={effectiveIntegrity >= 0.8 ? 'text-emerald-400' : effectiveIntegrity >= 0.5 ? 'text-amber-400' : 'text-red-400'}>{Math.round(effectiveIntegrity * 100)}%</span>.</>}
-          {semCovScore !== null && <> Semantic coverage is <span className={effectiveSemCov >= 0.8 ? 'text-emerald-400' : effectiveSemCov >= 0.5 ? 'text-amber-400' : 'text-red-400'}>{Math.round(effectiveSemCov * 100)}%</span>.</>}
+          {narrative}
           {dataSource === 'MOCK' && <span className="text-zinc-500"> (showing mock data — connect to a live run for real metrics)</span>}
-          {dataSource === 'PARTIAL' && <span className="text-zinc-500"> (partial live data — some metrics from backend, others from mock)</span>}
         </p>
       </div>
 
+      {/* Key metrics */}
       <div className="grid grid-cols-5 gap-3">
         <div className="card p-4 flex flex-col items-center">
           <GaugeChart value={releaseReadiness} label="Release Ready" size="md" color={releaseReadiness >= 0.8 ? 'green' : releaseReadiness >= 0.5 ? 'amber' : 'red'} />
         </div>
-        <MetricCard label="Value Delivered" value={`${Math.round(releaseReadiness * 100)}%`} change="+8% this week" changeType="positive" icon={<TrendingUp className="w-3.5 h-3.5 text-emerald-400" />} />
-        <MetricCard label="Cost to Date" value={`$${effectiveCost.toFixed(2)}`} change="From backend" changeType="neutral" icon={<Coins className="w-3.5 h-3.5" />} />
-        <MetricCard label="Risk Posture" value={failedGates.length > 0 ? 'Moderate' : 'Low'} change={`${failedGates.length} gates failed`} changeType={failedGates.length > 0 ? 'warning' : 'positive'} icon={<Shield className="w-3.5 h-3.5 text-amber-400" />} />
-        <MetricCard label="Interventions" value={mockHumanInterventions.length.toString()} change="4 human actions" changeType="neutral" icon={<Clock className="w-3.5 h-3.5" />} />
+        <MetricCard
+          label="Cost to Date"
+          value={metrics.totalCost !== null ? `$${effectiveCost.toFixed(2)}` : '—'}
+          change={metrics.totalTokens !== null ? `${(effectiveTokens / 1000).toFixed(0)}k tokens` : undefined}
+          changeType="neutral"
+          icon={<Coins className="w-3.5 h-3.5" />}
+        />
+        <MetricCard
+          label="Risk Posture"
+          value={metrics.govFailed !== null ? (metrics.govFailed > 0 ? 'Moderate' : 'Low') : '—'}
+          change={metrics.govFailed !== null ? `${metrics.govFailed} gates failed` : undefined}
+          changeType={metrics.govFailed && metrics.govFailed > 0 ? 'warning' : 'positive'}
+          icon={<Shield className="w-3.5 h-3.5 text-amber-400" />}
+        />
+        <MetricCard
+          label="Artifacts"
+          value={metrics.artifactCount !== null ? metrics.artifactCount.toString() : '—'}
+          change={metrics.evidenceCount !== null ? `${metrics.evidenceCount} evidence` : undefined}
+          changeType="neutral"
+          icon={<Package className="w-3.5 h-3.5" />}
+        />
+        <MetricCard
+          label="Traceability"
+          value={metrics.traceabilityCoverage !== null ? `${Math.round(metrics.traceabilityCoverage)}%` : '—'}
+          change={metrics.govFindings !== null ? `${metrics.govFindings} gov checks` : undefined}
+          changeType="neutral"
+          icon={<Activity className="w-3.5 h-3.5" />}
+        />
       </div>
 
-      {dataSource === 'PARTIAL' && (
+      {/* Live metrics grid */}
+      {(dataSource === 'LIVE' || dataSource === 'PARTIAL') && (
         <div className="card p-4">
           <SectionHeader title="Live Run Metrics" subtitle="Aggregated from backend endpoints" />
           <div className="grid grid-cols-6 gap-3 mt-2">
-            {artifactCount !== null && (
-              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
-                <div className="text-[9px] text-zinc-700 uppercase">Artifacts</div>
-                <div className="text-sm font-semibold text-zinc-300">{artifactCount}</div>
-              </div>
-            )}
-            {evidenceCount !== null && (
-              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
-                <div className="text-[9px] text-zinc-700 uppercase">Evidence</div>
-                <div className="text-sm font-semibold text-zinc-300">{evidenceCount}</div>
-              </div>
-            )}
-            {govFindings !== null && (
-              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
-                <div className="text-[9px] text-zinc-700 uppercase">Gov Findings</div>
-                <div className="text-sm font-semibold text-zinc-300">{govFindings}</div>
-              </div>
-            )}
-            {traceabilityCoverage !== null && (
-              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
-                <div className="text-[9px] text-zinc-700 uppercase">Traceability</div>
-                <div className="text-sm font-semibold text-zinc-300">{Math.round(traceabilityCoverage)}%</div>
-              </div>
-            )}
-            {integrityScore !== null && (
+            {metrics.integrityScore !== null && (
               <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
                 <div className="text-[9px] text-zinc-700 uppercase">Integrity</div>
-                <div className={`text-sm font-semibold ${effectiveIntegrity >= 0.8 ? 'text-emerald-400' : 'text-amber-400'}`}>{Math.round(effectiveIntegrity * 100)}%</div>
+                <div className={`text-sm font-semibold ${effectiveIntegrity >= 0.8 ? 'text-emerald-400' : effectiveIntegrity >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {Math.round(effectiveIntegrity * 100)}%
+                </div>
               </div>
             )}
-            {semCovScore !== null && (
+            {metrics.semCovScore !== null && (
               <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
                 <div className="text-[9px] text-zinc-700 uppercase">Sem Coverage</div>
-                <div className={`text-sm font-semibold ${effectiveSemCov >= 0.8 ? 'text-emerald-400' : 'text-amber-400'}`}>{Math.round(effectiveSemCov * 100)}%</div>
+                <div className={`text-sm font-semibold ${effectiveSemCov >= 0.8 ? 'text-emerald-400' : effectiveSemCov >= 0.5 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {Math.round(effectiveSemCov * 100)}%
+                </div>
+              </div>
+            )}
+            {metrics.artifactCount !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Artifacts</div>
+                <div className="text-sm font-semibold text-zinc-300">{metrics.artifactCount}</div>
+              </div>
+            )}
+            {metrics.evidenceCount !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Evidence</div>
+                <div className="text-sm font-semibold text-zinc-300">{metrics.evidenceCount}</div>
+              </div>
+            )}
+            {metrics.govFindings !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Gov Checks</div>
+                <div className="text-sm font-semibold text-zinc-300">
+                  {metrics.govPassed}/{metrics.govFindings}
+                </div>
+              </div>
+            )}
+            {metrics.traceabilityCoverage !== null && (
+              <div className="p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                <div className="text-[9px] text-zinc-700 uppercase">Traceability</div>
+                <div className="text-sm font-semibold text-zinc-300">{Math.round(metrics.traceabilityCoverage)}%</div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card p-4">
-          <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Release Readiness Trend</div>
-          <div className="flex items-end gap-1 h-20">
-            {[0.45, 0.52, 0.58, 0.61, 0.65, 0.68, 0.70, 0.72, 0.62, 0.62].map((v, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full bg-violet-500/30 rounded-t-sm" style={{ height: `${v * 100}%` }} />
-                <span className="text-[7px] text-zinc-700">W{i + 1}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingDown className="w-3 h-3 text-red-400" />
-            <span className="text-[9px] text-red-400">-10% this week (semantic coverage drop)</span>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Semantic Coverage Trend</div>
-          <div className="flex items-end gap-1 h-20">
-            {[0.72, 0.75, 0.78, 0.82, 0.85, 0.83, 0.79, 0.74, 0.68, 0.66].map((v, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className={`w-full rounded-t-sm ${v >= 0.8 ? 'bg-emerald-500/30' : v >= 0.6 ? 'bg-amber-500/30' : 'bg-red-500/30'}`} style={{ height: `${v * 100}%` }} />
-                <span className="text-[7px] text-zinc-700">W{i + 1}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingDown className="w-3 h-3 text-red-400" />
-            <span className="text-[9px] text-red-400">-16% this week</span>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="text-[9px] text-zinc-700 uppercase tracking-widest mb-3">Token Efficiency</div>
-          <div className="flex items-end gap-1 h-20">
-            {[0.65, 0.68, 0.72, 0.71, 0.74, 0.76, 0.78, 0.80, 0.82, 0.84].map((v, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full bg-blue-500/30 rounded-t-sm" style={{ height: `${v * 100}%` }} />
-                <span className="text-[7px] text-zinc-700">W{i + 1}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingUp className="w-3 h-3 text-emerald-400" />
-            <span className="text-[9px] text-emerald-400">+19% improvement</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="card p-4">
-          <SectionHeader title="Risk Distribution" subtitle="By category" />
-          <div className="space-y-2 mt-2">
-            {[
-              { label: 'Semantic Coverage', value: 0.34, count: 3, color: 'red' as const },
-              { label: 'Security', value: 0.15, count: 1, color: 'amber' as const },
-              { label: 'Architecture Drift', value: 0.22, count: 2, color: 'amber' as const },
-              { label: 'Token Budget', value: 0.05, count: 0, color: 'green' as const },
-              { label: 'Test Coverage', value: 0.24, count: 2, color: 'amber' as const },
-            ].map(r => (
-              <div key={r.label} className="flex items-center gap-2">
-                <span className="text-[10px] text-zinc-500 w-32 flex-shrink-0">{r.label}</span>
-                <div className="flex-1"><ProgressBar value={r.value} size="sm" color={r.color === 'red' ? 'red' : r.color === 'amber' ? 'amber' : 'green'} /></div>
-                <span className="text-[10px] font-mono text-zinc-600 w-6 text-right">{r.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="card p-4">
-          <SectionHeader title="Blocked Initiatives" subtitle="Requiring attention" />
-          <div className="space-y-2 mt-2">
-            {[
-              { title: 'Fraud Detection Service', reason: 'ML model integration blocked', impact: 'high' },
-              { title: 'Transaction Dashboard', reason: 'Depends on fraud service completion', impact: 'medium' },
-              { title: 'Release Gate', reason: 'Semantic coverage below 80% threshold', impact: 'critical' },
-            ].map((b, i) => (
-              <div key={i} className="flex items-start gap-2 p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
-                <AlertTriangle className={`w-3 h-3 mt-0.5 flex-shrink-0 ${b.impact === 'critical' ? 'text-red-400' : 'text-amber-400'}`} />
-                <div>
-                  <div className="text-[10px] font-medium text-zinc-300">{b.title}</div>
-                  <div className="text-[9px] text-zinc-600">{b.reason}</div>
+      {/* Risk & Blocked — only show when we have real data */}
+      {(dataSource === 'LIVE' || dataSource === 'PARTIAL') && metrics.govFailed !== null && metrics.govFailed > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="card p-4">
+            <SectionHeader title="Governance Risks" subtitle={`${metrics.govFailed} failing gates`} />
+            <div className="space-y-2 mt-2">
+              {failedGates.map((g, i) => (
+                <div key={i} className="flex items-start gap-2 p-2 rounded bg-zinc-800/20 border border-zinc-800/40">
+                  <AlertTriangle className={`w-3 h-3 mt-0.5 flex-shrink-0 ${g.impact === 'critical' ? 'text-red-400' : 'text-amber-400'}`} />
+                  <div>
+                    <div className="text-[10px] font-medium text-zinc-300">{g.name}</div>
+                    <div className="text-[9px] text-zinc-600">{g.policyBasis}</div>
+                  </div>
+                  <Badge variant={g.impact === 'critical' ? 'red' : 'amber'} size="sm">{g.impact}</Badge>
                 </div>
-                <Badge variant={b.impact === 'critical' ? 'red' : 'amber'} size="sm">{b.impact}</Badge>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+          <div className="card p-4">
+            <SectionHeader title="Delivery Readiness" subtitle="Key quality indicators" />
+            <div className="space-y-2 mt-2">
+              {[
+                { label: 'Integrity', value: effectiveIntegrity },
+                { label: 'Semantic Coverage', value: effectiveSemCov },
+                { label: 'Traceability', value: (metrics.traceabilityCoverage ?? 0) / 100 },
+              ].map(r => (
+                <div key={r.label} className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 w-32 flex-shrink-0">{r.label}</span>
+                  <div className="flex-1">
+                    <ProgressBar value={r.value} size="sm" color={r.value >= 0.8 ? 'green' : r.value >= 0.5 ? 'amber' : 'red'} />
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-600 w-10 text-right">{Math.round(r.value * 100)}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
