@@ -6,7 +6,7 @@ from src.api.v1.endpoints import (
     projects, runs, phases, agents, tasks, artifacts, approvals,
     logs, evidence, costs, patterns, memory,
     github as github_endpoints, deployment, settings, engines, pipeline, cognitive,
-    semantic_coverage, auth, workspaces, operations, operator_intervention,
+    semantic_coverage, auth, workspaces, operations, operator_intervention, memory_lifecycle,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -102,5 +102,10 @@ api_router.include_router(
 
 api_router.include_router(
     operator_intervention.router, tags=["operator-intervention"],
+    dependencies=[Depends(get_current_user)],
+)
+
+api_router.include_router(
+    memory_lifecycle.router, tags=["memory-lifecycle"],
     dependencies=[Depends(get_current_user)],
 )
