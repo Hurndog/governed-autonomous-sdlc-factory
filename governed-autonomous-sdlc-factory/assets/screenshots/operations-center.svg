@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#09090b"/>
+  <rect x="0" y="0" width="1200" height="60" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+  <text x="20" y="38" fill="#e4e4e7" font-family="monospace" font-size="18" font-weight="bold">🏛️ Governed Autonomous SDLC Factory</text>
+  <text x="900" y="38" fill="#34d399" font-family="monospace" font-size="14">● LIVE</text>
+  
+  <!-- Sidebar -->
+  <rect x="0" y="60" width="220" height="740" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+  <text x="20" y="100" fill="#a1a1aa" font-family="monospace" font-size="12">OPERATIONS</text>
+  <rect x="10" y="110" width="200" height="36" fill="#27272a" rx="4"/>
+  <text x="20" y="133" fill="#34d399" font-family="monospace" font-size="13">▸ Operations Center</text>
+  <text x="20" y="165" fill="#71717a" font-family="monospace" font-size="13">  Explainability Room</text>
+  <text x="20" y="190" fill="#71717a" font-family="monospace" font-size="13">  Model Operations</text>
+  <text x="20" y="215" fill="#71717a" font-family="monospace" font-size="13">  Operator Console</text>
+  <text x="20" y="240" fill="#71717a" font-family="monospace" font-size="13">  Memory Operations</text>
+  
+  <!-- Health Gauges -->
+  <rect x="240" y="80" width="220" height="140" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="260" y="110" fill="#a1a1aa" font-family="monospace" font-size="12">TRUST SCORE</text>
+  <text x="260" y="155" fill="#34d399" font-family="monospace" font-size="36" font-weight="bold">0.87</text>
+  <rect x="260" y="170" width="160" height="8" fill="#27272a" rx="4"/>
+  <rect x="260" y="170" width="139" height="8" fill="#34d399" rx="4"/>
+  
+  <rect x="480" y="80" width="220" height="140" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="500" y="110" fill="#a1a1aa" font-family="monospace" font-size="12">ACTIVE RUNS</text>
+  <text x="500" y="155" fill="#60a5fa" font-family="monospace" font-size="36" font-weight="bold">12</text>
+  <text x="500" y="190" fill="#71717a" font-family="monospace" font-size="11">3 completing</text>
+  
+  <rect x="720" y="80" width="220" height="140" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="740" y="110" fill="#a1a1aa" font-family="monospace" font-size="12">DRIFT STATUS</text>
+  <text x="740" y="155" fill="#fbbf24" font-family="monospace" font-size="36" font-weight="bold">LOW</text>
+  <text x="740" y="190" fill="#71717a" font-family="monospace" font-size="11">2 models monitored</text>
+  
+  <rect x="960" y="80" width="220" height="140" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="980" y="110" fill="#a1a1aa" font-family="monospace" font-size="12">COST TODAY</text>
+  <text x="980" y="155" fill="#a78bfa" font-family="monospace" font-size="36" font-weight="bold">$4.20</text>
+  <text x="980" y="190" fill="#71717a" font-family="monospace" font-size="11">of $50.00 budget</text>
+  
+  <!-- Event Stream -->
+  <rect x="240" y="240" width="940" height="540" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="260" y="270" fill="#a1a1aa" font-family="monospace" font-size="12">LIVE EVENT STREAM</text>
+  <rect x="260" y="285" width="900" height="1" fill="#27272a"/>
+  
+  <text x="260" y="310" fill="#34d399" font-family="monospace" font-size="11">12:00:01</text>
+  <text x="350" y="310" fill="#60a5fa" font-family="monospace" font-size="11">phase.completed</text>
+  <text x="500" y="310" fill="#e4e4e7" font-family="monospace" font-size="11">Run abc-123: implementation phase completed (trust: 0.91)</text>
+  
+  <text x="260" y="335" fill="#34d399" font-family="monospace" font-size="11">12:00:03</text>
+  <text x="350" y="335" fill="#a78bfa" font-family="monospace" font-size="11">model.selected</text>
+  <text x="500" y="335" fill="#e4e4e7" font-family="monospace" font-size="11">qwen2.5-coder selected for code_generation (sovereign_preferred)</text>
+  
+  <text x="260" y="360" fill="#34d399" font-family="monospace" font-size="11">12:00:05</text>
+  <text x="350" y="360" fill="#fbbf24" font-family="monospace" font-size="11">drift.detected</text>
+  <text x="500" y="360" fill="#e4e4e7" font-family="monospace" font-size="11">Semantic drift detected in model phi3: delta=0.12 (threshold: 0.15)</text>
+  
+  <text x="260" y="385" fill="#34d399" font-family="monospace" font-size="11">12:00:08</text>
+  <text x="350" y="385" fill="#34d399" font-family="monospace" font-size="11">gate.passed</text>
+  <text x="500" y="385" fill="#e4e4e7" font-family="monospace" font-size="11">Release gate passed for run abc-123 (integrity: 0.94)</text>
+  
+  <text x="260" y="410" fill="#34d399" font-family="monospace" font-size="11">12:00:10</text>
+  <text x="350" y="410" fill="#f87171" font-family="monospace" font-size="11">intervention.pause</text>
+  <text x="500" y="410" fill="#e4e4e7" font-family="monospace" font-size="11">Operator paused run def-456: trust score degradation detected</text>
+  
+  <text x="260" y="435" fill="#34d399" font-family="monospace" font-size="11">12:00:12</text>
+  <text x="350" y="435" fill="#60a5fa" font-family="monospace" font-size="11">arbitration.completed</text>
+  <text x="500" y="435" fill="#e4e4e7" font-family="monospace" font-size="11">3-model arbitration: consensus=0.82, no escalation required</text>
+  
+  <text x="260" y="460" fill="#34d399" font-family="monospace" font-size="11">12:00:15</text>
+  <text x="350" y="460" fill="#a78bfa" font-family="monospace" font-size="11">memory.archived</text>
+  <text x="500" y="460" fill="#e4e4e7" font-family="monospace" font-size="11">247 memory entries archived (age threshold: 30 days)</text>
+  
+  <text x="260" y="485" fill="#34d399" font-family="monospace" font-size="11">12:00:18</text>
+  <text x="350" y="485" fill="#34d399" font-family="monospace" font-size="11">evidence.captured</text>
+  <text x="500" y="485" fill="#e4e4e7" font-family="monospace" font-size="11">Evidence bundle created for run abc-123 (47 records, 2.3MB)</text>
+  
+  <text x="260" y="510" fill="#34d399" font-family="monospace" font-size="11">12:00:20</text>
+  <text x="350" y="510" fill="#fbbf24" font-family="monospace" font-size="11">trust.updated</text>
+  <text x="500" y="510" fill="#e4e4e7" font-family="monospace" font-size="11">Model qwen2.5-coder trust: 0.85 → 0.88 (successful arbitration)</text>
+  
+  <text x="260" y="535" fill="#34d399" font-family="monospace" font-size="11">12:00:22</text>
+  <text x="350" y="535" fill="#60a5fa" font-family="monospace" font-size="11">run.started</text>
+  <text x="500" y="535" fill="#e4e4e7" font-family="monospace" font-size="11">New run ghi-789 started: "Build invoice processing microservice"</text>
+  
+  <text x="260" y="760" fill="#52525b" font-family="monospace" font-size="10">Showing 10 of 847 events • SSE connected • Last update: 12:00:22</text>
+</svg>

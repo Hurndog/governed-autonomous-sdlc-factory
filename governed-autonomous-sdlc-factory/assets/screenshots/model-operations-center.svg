@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#09090b"/>
+  <rect x="0" y="0" width="1200" height="60" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+  <text x="20" y="38" fill="#e4e4e7" font-family="monospace" font-size="18" font-weight="bold">🧠 Model Operations Center</text>
+  
+  <!-- Tabs -->
+  <rect x="0" y="60" width="1200" height="40" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+  <rect x="20" y="65" width="120" height="30" fill="#27272a" rx="4"/>
+  <text x="40" y="85" fill="#34d399" font-family="monospace" font-size="12">Active Models</text>
+  <text x="160" y="85" fill="#71717a" font-family="monospace" font-size="12">Routing Decisions</text>
+  <text x="330" y="85" fill="#71717a" font-family="monospace" font-size="12">Arbitration</text>
+  <text x="450" y="85" fill="#71717a" font-family="monospace" font-size="12">Sovereignty</text>
+  <text x="570" y="85" fill="#71717a" font-family="monospace" font-size="12">Health</text>
+  <text x="650" y="85" fill="#71717a" font-family="monospace" font-size="12">Trust Evolution</text>
+  
+  <!-- Model Cards -->
+  <rect x="20" y="120" width="280" height="180" fill="#18181b" stroke="#34d399" stroke-width="1" rx="6"/>
+  <text x="40" y="150" fill="#34d399" font-family="monospace" font-size="13" font-weight="bold">● Ollama / qwen2.5-coder</text>
+  <text x="40" y="175" fill="#71717a" font-family="monospace" font-size="11">Trust: 0.88 • Latency: 45ms</text>
+  <text x="40" y="195" fill="#71717a" font-family="monospace" font-size="11">Hallucination risk: LOW (0.05)</text>
+  <text x="40" y="215" fill="#71717a" font-family="monospace" font-size="11">Sovereignty: ✅ LOCAL</text>
+  <text x="40" y="235" fill="#71717a" font-family="monospace" font-size="11">Coding quality: 0.92</text>
+  <text x="40" y="255" fill="#71717a" font-family="monospace" font-size="11">Reasoning: 0.85</text>
+  <text x="40" y="275" fill="#71717a" font-family="monospace" font-size="11">Cost: $0.00 (local)</text>
+  
+  <rect x="320" y="120" width="280" height="180" fill="#18181b" stroke="#34d399" stroke-width="1" rx="6"/>
+  <text x="340" y="150" fill="#34d399" font-family="monospace" font-size="13" font-weight="bold">● Ollama / phi3:mini</text>
+  <text x="340" y="175" fill="#71717a" font-family="monospace" font-size="11">Trust: 0.82 • Latency: 22ms</text>
+  <text x="340" y="195" fill="#71717a" font-family="monospace" font-size="11">Hallucination risk: MED (0.12)</text>
+  <text x="340" y="215" fill="#71717a" font-family="monospace" font-size="11">Sovereignty: ✅ LOCAL</text>
+  <text x="340" y="235" fill="#71717a" font-family="monospace" font-size="11">Coding quality: 0.78</text>
+  <text x="340" y="255" fill="#71717a" font-family="monospace" font-size="11">Reasoning: 0.88</text>
+  <text x="340" y="275" fill="#71717a" font-family="monospace" font-size="11">Cost: $0.00 (local)</text>
+  
+  <rect x="620" y="120" width="280" height="180" fill="#18181b" stroke="#60a5fa" stroke-width="1" rx="6"/>
+  <text x="640" y="150" fill="#60a5fa" font-family="monospace" font-size="13" font-weight="bold">● OpenAI / GPT-4o</text>
+  <text x="640" y="175" fill="#71717a" font-family="monospace" font-size="11">Trust: 0.91 • Latency: 120ms</text>
+  <text x="640" y="195" fill="#71717a" font-family="monospace" font-size="11">Hallucination risk: LOW (0.03)</text>
+  <text x="640" y="215" fill="#71717a" font-family="monospace" font-size="11">Sovereignty: ☁️ FRONTIER</text>
+  <text x="640" y="235" fill="#71717a" font-family="monospace" font-size="11">Coding quality: 0.95</text>
+  <text x="640" y="255" fill="#71717a" font-family="monospace" font-size="11">Reasoning: 0.93</text>
+  <text x="640" y="275" fill="#71717a" font-family="monospace" font-size="11">Cost: $0.008/1K tokens</text>
+  
+  <rect x="920" y="120" width="260" height="180" fill="#18181b" stroke="#60a5fa" stroke-width="1" rx="6"/>
+  <text x="940" y="150" fill="#60a5fa" font-family="monospace" font-size="13" font-weight="bold">● Anthropic / Claude 3.5</text>
+  <text x="940" y="175" fill="#71717a" font-family="monospace" font-size="11">Trust: 0.93 • Latency: 95ms</text>
+  <text x="940" y="195" fill="#71717a" font-family="monospace" font-size="11">Hallucination risk: LOW (0.02)</text>
+  <text x="940" y="215" fill="#71717a" font-family="monospace" font-size="11">Sovereignty: ☁️ FRONTIER</text>
+  <text x="940" y="235" fill="#71717a" font-family="monospace" font-size="11">Coding quality: 0.94</text>
+  <text x="940" y="255" fill="#71717a" font-family="monospace" font-size="11">Reasoning: 0.95</text>
+  <text x="940" y="275" fill="#71717a" font-family="monospace" font-size="11">Cost: $0.015/1K tokens</text>
+  
+  <!-- Sovereignty Dashboard -->
+  <rect x="20" y="320" width="580" height="460" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="40" y="350" fill="#a1a1aa" font-family="monospace" font-size="12">SOVEREIGNTY DASHBOARD</text>
+  <rect x="40" y="365" width="540" height="1" fill="#27272a"/>
+  
+  <text x="40" y="395" fill="#e4e4e7" font-family="monospace" font-size="12">Local vs Frontier Usage (24h)</text>
+  <!-- Bar chart -->
+  <rect x="40" y="420" width="400" height="20" fill="#27272a" rx="4"/>
+  <rect x="40" y="420" width="280" height="20" fill="#34d399" rx="4"/>
+  <text x="450" y="435" fill="#e4e4e7" font-family="monospace" font-size="11">70% Local</text>
+  
+  <text x="40" y="470" fill="#e4e4e7" font-family="monospace" font-size="12">Provider Concentration Risk</text>
+  <text x="40" y="490" fill="#34d399" font-family="monospace" font-size="11">LOW — 4 providers active</text>
+  
+  <text x="40" y="530" fill="#e4e4e7" font-family="monospace" font-size="12">Sovereignty Distribution</text>
+  <text x="40" y="550" fill="#34d399" font-family="monospace" font-size="11">✅ Local: 2 models (Ollama)</text>
+  <text x="40" y="570" fill="#60a5fa" font-family="monospace" font-size="11">☁️ Frontier: 2 models (OpenAI, Anthropic)</text>
+  <text x="40" y="590" fill="#71717a" font-family="monospace" font-size="11">🔄 Hybrid: 0 models</text>
+  
+  <text x="40" y="630" fill="#e4e4e7" font-family="monospace" font-size="12">Data Sovereignty Compliance</text>
+  <rect x="40" y="650" width="400" height="20" fill="#27272a" rx="4"/>
+  <rect x="40" y="650" width="380" height="20" fill="#34d399" rx="4"/>
+  <text x="450" y="665" fill="#e4e4e7" font-family="monospace" font-size="11">95% Compliant</text>
+  
+  <!-- Trust Evolution -->
+  <rect x="620" y="320" width="560" height="460" fill="#18181b" stroke="#27272a" stroke-width="1" rx="6"/>
+  <text x="640" y="350" fill="#a1a1aa" font-family="monospace" font-size="12">TRUST EVOLUTION (7 days)</text>
+  <rect x="640" y="365" width="520" height="1" fill="#27272a"/>
+  
+  <!-- Mini chart -->
+  <polyline points="640,550 700,560 760,540 820,530 880,520 940,510 1000,500 1060,490 1120,480" fill="none" stroke="#34d399" stroke-width="2"/>
+  <text x="640" y="570" fill="#71717a" font-family="monospace" font-size="10">qwen2.5-coder: 0.82 → 0.88 ↑</text>
+  
+  <polyline points="640,600 700,610 760,600 820,590 880,580 940,570 1000,560 1060,550 1120,540" fill="none" stroke="#60a5fa" stroke-width="2"/>
+  <text x="640" y="620" fill="#71717a" font-family="monospace" font-size="10">GPT-4o: 0.89 → 0.91 ↑</text>
+  
+  <polyline points="640,650 700,660 760,670 820,660 880,650 940,640 1000,630 1060,620 1120,610" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <text x="640" y="670" fill="#71717a" font-family="monospace" font-size="10">phi3: 0.85 → 0.82 ↓ (drift detected)</text>
+  
+  <rect x="640" y="700" width="520" height="1" fill="#27272a"/>
+  <text x="640" y="725" fill="#a1a1aa" font-family="monospace" font-size="12">GOVERNANCE INCIDENTS</text>
+  <text x="640" y="745" fill="#fbbf24" font-family="monospace" font-size="11">⚠ 2 drift alerts (phi3)</text>
+  <text x="640" y="765" fill="#34d399" font-family="monospace" font-size="11">✓ 0 hallucination incidents</text>
+</svg>

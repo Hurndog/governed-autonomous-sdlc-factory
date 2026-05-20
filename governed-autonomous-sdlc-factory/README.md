@@ -1,164 +1,368 @@
-# Governed Autonomous SDLC Factory
+# 🏛️ Governed Autonomous SDLC Factory
 
-## Forge Control Tower — UI-Operated Autonomous Software Factory
+> **A governed cognitive runtime for autonomous enterprise systems.**
+>
+> Explainable. Controllable. Sovereign. Auditable.
 
-A governed, autonomous SDLC runtime that transforms natural language software ideas into
-complete, tested, documented, and deployed applications — with full observability,
-governance controls, evidence bundles, cost tracking, and MCP-based tool abstraction.
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![TypeScript](https://img.shields.io/badge/typescript-5.3+-blue.svg)](https://typescriptlang.org)
+[![FastAPI](https://img.shields.io/badge/fastapi-0.115-green.svg)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/next.js-14-black.svg)](https://nextjs.org)
 
-### Quick Start
+---
+
+## Vision
+
+The AI industry has a governance problem.
+
+Current agentic systems optimize for capability demonstrations while treating governance, observability, and controllability as afterthoughts. The result: agents that cannot explain themselves, cannot be stopped, cannot be audited, and cannot be trusted.
+
+**The Governed Autonomous SDLC Factory is different.**
+
+This is not a chatbot. This is not a prompt chain. This is an **enterprise cognitive runtime** designed for environments where AI decisions have consequences.
+
+We believe that **governance is not a constraint on AI capability — it is a prerequisite for AI deployment in any environment where decisions have consequences.**
+
+---
+
+## What This Platform Is
+
+The Governed Autonomous SDLC Factory transforms natural language software specifications into complete, tested, documented, and deployed applications — with:
+
+- 🔍 **Full observability** — Real-time telemetry via SSE streams
+- 🏛️ **Governance by default** — Every action is governed, every decision is auditable
+- 🧠 **Multi-model cognition** — Arbitrated decisions across multiple AI models
+- 🔒 **Sovereignty-aware routing** — Control over where cognition happens
+- 📜 **Immutable evidence** — Forensic reconstruction of any decision
+- 🛑 **Operator intervention** — Humans can intervene at any point
+- 🔄 **Deterministic replay** — Any run can be reconstructed and verified
+- 💰 **Cost governance** — Budget controls with hard limits and alerts
+
+---
+
+## Why Enterprise AI Needs Governance
+
+| Problem | Traditional Agents | This Platform |
+|---------|-------------------|---------------|
+| Explainability | ❌ Black box | ✅ Causal narratives from evidence |
+| Auditability | ❌ No audit trail | ✅ Immutable audit trail with hash chains |
+| Controllability | ❌ Run until done | ✅ 8 intervention types |
+| Sovereignty | ❌ Data leaves premises | ✅ Sovereignty-aware routing |
+| Trust | ❌ Faith-based | ✅ Computed trust scores |
+| Cost | ❌ Unbounded | ✅ Budget controls with limits |
+| Replay | ❌ Cannot reconstruct | ✅ Deterministic replay |
+| Disagreement | ❌ Suppressed | ✅ Surfaced and analyzed |
+
+---
+
+## Core Features
+
+### 🧠 Multi-Model Cognitive Governance
+
+Dynamic model selection based on task type, governance requirements, sovereignty constraints, and cost budgets. Supports Ollama, OpenAI, Anthropic, Gemini, and OpenRouter.
+
+### ⚖️ Cognitive Arbitration Engine
+
+Execute tasks across multiple models, analyze disagreement, and produce governed decisions. Disagreement is surfaced, never suppressed.
+
+### 🔍 Explainability Engine
+
+Causal narratives grounded in actual database records. Eight explanation types: runtime, trust, drift, replay, governance, memory, interventions, autonomy.
+
+### 🏛️ Governance Layer
+
+OPA Rego policies enforced at every layer. RBAC with 30+ granular permissions. Trust scores that affect autonomy levels.
+
+### 🔒 Sovereignty-Aware Routing
+
+Five sovereignty levels from `local_only` to `frontier_only`. Control over where data is processed and which models are used.
+
+### 📜 Evidence & Replay
+
+Immutable evidence bundles with hash-chained integrity. Deterministic replay of any previous run with tamper detection.
+
+### 🛑 Operator Intervention
+
+Eight intervention types: pause, resume, quarantine, rollback, escalate, throttle, override, terminate. All recorded in the audit trail.
+
+### 🧠 Memory Lifecycle
+
+Seven lifecycle states: active, stale, expired, archived, quarantined, pending_review, degraded. Archival preserves evidence links.
+
+### 📊 Real-Time Telemetry
+
+SSE streams for live event telemetry. Prometheus metrics. Structured logging with trace correlation.
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Frontend (Next.js 14 + TypeScript + Tailwind)          │
+│  35+ Room Components • SSE • WebSocket • Recharts       │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTP / SSE / WebSocket
+┌────────────────────────▼────────────────────────────────┐
+│  API Layer (FastAPI + Pydantic v2)                      │
+│  27+ Endpoint Modules • Middleware • SSE Streams        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Engine Layer (17+ Specialized Engines)                 │
+│  Model Router • Arbitration • Governance • Replay       │
+│  Drift Control • Semantic Coverage • Evidence           │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Infrastructure                                         │
+│  PostgreSQL • Redis • Qdrant • Ollama • Prometheus      │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 15+
+- Redis 7+
+
+### Installation
 
 ```bash
-# 1. Clone and enter
+# 1. Clone
+git clone https://github.com/your-org/governed-autonomous-sdlc-factory.git
 cd governed-autonomous-sdlc-factory
 
-# 2. Copy environment
+# 2. Configure
 cp .env.example .env
+# Edit .env with your settings
 
-# 3. Launch infrastructure
+# 3. Backend
+python -m venv venv && source venv/bin/activate
+pip install -r apps/api/requirements.txt
+cd apps/api && python -m alembic upgrade head && cd ../..
+
+# 4. Frontend
+cd apps/web && npm install && cd ../..
+
+# 5. Start infrastructure
 docker-compose up -d postgres redis qdrant
 
-# 4. Run migrations
-cd apps/api && python -m alembic upgrade head
-
-# 5. Seed demo data
-python -m scripts.seed_demo
-
 # 6. Start backend
-python -m uvicorn src.main:app --reload --port 8000
+cd apps/api && python -m uvicorn src.main:app --reload --port 8000
 
 # 7. Start frontend (new terminal)
-cd apps/web && npm install && npm run dev
+cd apps/web && npm run dev
 
 # 8. Open Control Tower
 open http://localhost:3000
 ```
 
-### Architecture
+### Docker Quick Start
 
-- **Frontend**: Next.js + React + Tailwind + shadcn/ui (Forge Control Tower)
-- **Backend**: FastAPI + Pydantic + SQLAlchemy
-- **Workflow**: LangGraph orchestration
-- **Database**: PostgreSQL
-- **Queue**: Redis
-- **Vector Memory**: Qdrant
-- **Governance**: OPA Rego policies
-- **Tool Protocol**: MCP servers for all tool access
-- **Observability**: OpenTelemetry + Prometheus + Loki-compatible logs
-- **Deployment**: Docker Compose localhost
+```bash
+git clone https://github.com/your-org/governed-autonomous-sdlc-factory.git
+cd governed-autonomous-sdlc-factory
+cp .env.example .env
+docker-compose up -d
+docker-compose exec api python -m alembic upgrade head
+open http://localhost:3000
+```
 
-### Key URLs
+---
+
+## Supported Providers
+
+### Local
+
+| Provider | Models | Sovereignty |
+|----------|--------|-------------|
+| Ollama | phi3, qwen2.5-coder, llama3.1, deepseek-r1 | ✅ Local |
+| llama.cpp | Any GGUF model | ✅ Local |
+
+### Remote
+
+| Provider | Models | Sovereignty |
+|----------|--------|-------------|
+| OpenAI | GPT-4o, GPT-4o-mini, o1 | ☁️ Frontier |
+| Anthropic | Claude 3.5 Sonnet, Claude 3 Opus | ☁️ Frontier |
+| Google | Gemini 1.5 Pro, Gemini 1.5 Flash | ☁️ Frontier |
+| OpenRouter | 100+ models | ☁️ Frontier |
+
+---
+
+## Supported Local Models
+
+| Model | Size | Speed (M4 Max) | Best For |
+|-------|------|----------------|----------|
+| phi3:mini | 2.3GB | ~80 tok/s | Fast reasoning |
+| qwen2.5-coder:7b | 4.7GB | ~55 tok/s | Code generation |
+| llama3.1:8b | 4.7GB | ~50 tok/s | General purpose |
+| deepseek-r1:7b | 4.7GB | ~45 tok/s | Deep reasoning |
+
+---
+
+## Key URLs
 
 | Service | URL |
 |---------|-----|
 | Forge Control Tower (UI) | http://localhost:3000 |
 | API | http://localhost:8000 |
 | API Docs (OpenAPI) | http://localhost:8000/docs |
-| Prometheus | http://localhost:9000 |
+| Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3001 |
 | Qdrant Dashboard | http://localhost:6333/dashboard |
 
-### Logs
+---
 
-- Build log: `logs/overnight-build-log.md`
-- Run logs: `logs/runs/<run-id>/run-log.jsonl`
-- Agent traces: `logs/runs/<run-id>/agent-traces.jsonl`
-- Tool calls: `logs/runs/<run-id>/tool-calls.jsonl`
-- Model calls: `logs/runs/<run-id>/model-calls.jsonl`
+## Documentation
 
-### Evidence
-
-- Completion checklist: `evidence/system-completion-checklist.json`
-- Completion report: `evidence/system-completion-report.md`
-- Run evidence bundles: `evidence/runs/<run-id>/evidence-bundle.zip`
-
-### Demo
-
-See `docs/user-guide/control-tower-user-guide.md` for full demo walkthrough.
-
-### Requirements Completion
-
-See `evidence/system-completion-report.md` for the full requirement-by-requirement status table.
+| Document | Description |
+|----------|-------------|
+| [Whitepaper](whitepaper/loveable-for-the-enterprise.md) | 5000+ word technical whitepaper |
+| [Architecture](docs/architecture/overview.md) | System architecture with Mermaid diagrams |
+| [API Reference](docs/api/reference.md) | Complete API endpoint reference |
+| [Runtime](docs/runtime/index.md) | Runtime lifecycle, trust scoring, drift detection |
+| [Governance](docs/governance/index.md) | Governance framework and policies |
+| [Security](docs/security/architecture.md) | Security architecture and best practices |
+| [Local Deployment](docs/deployment/local.md) | Local installation guide |
+| [Docker Deployment](docs/deployment/docker.md) | Docker deployment guide |
+| [VPS Deployment](docs/deployment/vps.md) | VPS deployment guide |
+| [Apple Silicon](docs/deployment/apple-silicon.md) | Apple Silicon optimized setup |
+| [Examples](examples/README.md) | Runnable example workflows |
 
 ---
 
-## Current Baseline Status
+## Example Workflows
 
-**Tag:** `v0.2.0-evidence-backed-runtime-pass`
-**Verdict:** PASS (evidence-backed operational acceptance)
-**Date:** 2026-05-14
-**Commit:** `e2fc386`
+- **Finance** — Automated report generation with sovereign-required routing
+- **Invoice Processing** — Multi-model extraction with disagreement detection
+- **Governance Escalation** — Automatic escalation on trust degradation
+- **Multi-Model Arbitration** — Parallel execution with consensus analysis
+- **Memory Archival** — Lifecycle management with evidence preservation
+- **Intervention Scenario** — Pause, quarantine, rollback, resume
+- **Trust Degradation** — Trust score changes and autonomy adjustment
 
-### What This System Does
+See [examples/](examples/README.md) for details.
 
-The Governed Autonomous SDLC Factory is a governed runtime that executes software development pipeline phases — from natural language specification through planning, implementation, verification, and release gating — with full evidence capture, integrity scoring, and safety controls. It is operated through a Next.js control plane UI and driven by a FastAPI + LangGraph backend.
+---
 
-This is a **governed runtime baseline**, not a finished enterprise product.
+## API Overview
 
-### Core Runtime Capabilities
+### Authentication
+- `POST /api/v1/auth/login` — Login
+- `POST /api/v1/auth/refresh` — Refresh token
 
-| Capability | Status |
-|---|---|
-| Pipeline execution (LangGraph) | ✅ Operational |
-| Semantic coverage scoring | ✅ Computed from real DB records |
-| Release gate | ✅ Functional (blocks below threshold) |
-| Seven-component integrity | ✅ 0.9508 overall score |
-| Safety guards (11 types) | ✅ Implemented and persisted |
-| Conflict detection (4 patterns) | ✅ Implemented and tested |
-| Evidence capture | ✅ 50+ evidence files |
-| Backup & restore | ✅ Verified (9MB bundle) |
-| Deterministic replay | ✅ Supported via snapshots |
+### Projects & Runs
+- `GET /api/v1/projects` — List projects
+- `POST /api/v1/runs` — Start run
+- `GET /api/v1/runs/{id}` — Get run details
 
-### Frontend Control Plane
+### Operations
+- `GET /api/v1/operations/summary` — System health
+- `GET /api/v1/operations/events` — Event log
+- `GET /api/v1/operations/events/stream` — SSE telemetry
 
-| Component | Status |
-|---|---|
-| Next.js 14 + React + Tailwind | ✅ |
-| TypeScript strict mode | ✅ Pass |
-| Build | ✅ Pass (4 pages) |
-| Rooms: Command Center, Governance, Architecture, Settings | ✅ |
+### Explainability
+- `GET /api/v1/explain/runtime/{id}` — Runtime explanation
+- `GET /api/v1/explain/trust/{id}` — Trust explanation
+- `GET /api/v1/explain/drift/{id}` — Drift explanation
 
-### Backend
+### Model Router
+- `GET /api/v1/model-router/capabilities` — Model capabilities
+- `POST /api/v1/model-router/route` — Get routing decision
+- `POST /api/v1/model-router/arbitrate` — Run arbitration
 
-| Component | Status |
-|---|---|
-| FastAPI + Pydantic | ✅ |
-| PostgreSQL (SQLAlchemy/asyncpg) | ✅ |
-| Test suite | ✅ 82/82 passing |
-| API endpoints | ✅ Operational |
-| MCP tool integration | ✅ |
+### Interventions
+- `POST /api/v1/interventions/pause` — Pause
+- `POST /api/v1/interventions/resume` — Resume
+- `POST /api/v1/interventions/quarantine` — Quarantine
+- `POST /api/v1/interventions/rollback` — Rollback
 
-### Model Runtime Support
+See [API Reference](docs/api/reference.md) for complete documentation.
 
-- Multi-provider routing (configurable per environment)
-- Model call budgets (5/phase, 50/run)
-- Token budgets (250,000/run)
-- Provider failover guard
-- Semantic iteration limit (5)
+---
 
-### Integrity Components
+## Roadmap
 
-1. Artifact hashing (SHA256)
-2. Event sourcing with hash chain
-3. Snapshot integrity
-4. Lineage tracking
-5. Evidence binding
-6. Replay verification
-7. Semantic coverage scoring
+### v0.6 — Semantic Execution Memory
+- Semantic execution patterns (not just facts)
+- Learning from past runs
+- Improved routing based on historical performance
 
-### Known Limitations
+### v0.7 — Ontology-Constrained Execution
+- Formal domain models
+- Constrained valid operations
+- Ontology-aware governance
 
-- **No authentication or authorization** — API is not exposed to untrusted users
-- **No multi-tenant isolation** — single-scope operation only
-- **No production deployment configuration** — no Docker Compose for production, no health checks, no monitoring
-- **No automated database migrations** — schema changes applied manually
-- **No PDF/audit export** — evidence exists as markdown only
-- **No human-in-the-loop approval** — release gate produces verdict without human approval step
-- **ESLint not configured** — build and typecheck pass without it
-- **Semantic coverage score below threshold (0.6559)** — genuine result, not a bug; improving it requires engine logic changes
+### v0.8 — Trust Decay Scoring
+- Natural trust decay over time
+- Reinforcement through success
+- Prevention of stale trust
 
-### Next Roadmap Phase
+### v0.9 — Deception Detection
+- Detect technically correct but misleading outputs
+- Identify governance avoidance patterns
+- Surface hidden biases
 
-**Phase 1: Security and Access Control** — Authentication, authorization, RBAC, user/project/workspace model, secrets management, API protection, audit access model.
+### v1.0 — Constitutional Governance
+- Immutable constitutional principles
+- Unoverrideable boundaries
+- External audit support
+- Evidence signing
 
-See `docs/roadmap/productization-roadmap-from-pass-baseline.md` for the full roadmap.
+---
+
+## Security Disclaimer
+
+This platform is designed for **governed autonomous operation within trusted environments**. It is not designed for direct exposure to untrusted users without additional security layers (WAF, API gateway, etc.).
+
+**Always:**
+- Deploy behind a reverse proxy with SSL termination
+- Use strong JWT secrets (256-bit minimum)
+- Rotate API keys regularly
+- Review audit logs weekly
+- Keep dependencies updated
+
+---
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `pytest tests/ -v`
+5. Run type check: `cd apps/web && npm run typecheck`
+6. Submit a pull request
+
+---
+
+## License
+
+Apache 2.0 — See [LICENSE](LICENSE) for details.
+
+---
+
+## Acknowledgments
+
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com) — Web framework
+- [Next.js](https://nextjs.org) — React framework
+- [PostgreSQL](https://postgresql.org) — Database
+- [Redis](https://redis.io) — Cache and queue
+- [Qdrant](https://qdrant.tech) — Vector memory
+- [Ollama](https://ollama.ai) — Local model serving
+- [OpenTelemetry](https://opentelemetry.io) — Observability
+- [OPA](https://openpolicyagent.org) — Policy engine
+
+---
+
+> *"Governance is not a constraint on AI capability. It is a prerequisite for AI deployment in any environment where decisions have consequences."*
