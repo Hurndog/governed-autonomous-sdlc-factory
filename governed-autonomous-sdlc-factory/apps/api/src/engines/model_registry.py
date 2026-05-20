@@ -63,22 +63,62 @@ class ModelRegistry:
         return self._models.get(f"{provider}:{model_id}")
 
     def get_default(self) -> Optional[ModelEntry]:
-        """Get the default model."""
+        """Get the default model (must be available)."""
         if self._default_model:
-            return self._models.get(self._default_model)
+            entry = self._models.get(self._default_model)
+            if entry and entry.is_available:
+                return entry
         # Return first available
         for entry in self._models.values():
             if entry.is_available:
                 return entry
         return None
 
+    def get_configured_default(self) -> Optional[ModelEntry]:
+        """Get the configured default model (even if unavailable)."""
+        if self._default_model:
+            return self._models.get(self._default_model)
+        # Return first configured model
+        for entry in self._models.values():
+            return entry
+        return None
+
+    def get_availability_summary(self) -> dict:
+        """Get summary of model availability."""
+        total = len(self._models)
+        available = sum(1 for e in self._models.values() if e.is_available)
+        unavailable = total - available
+        return {
+            "total": total,
+            "available": available,
+            "unavailable": unavailable,
+            "models": {
+                key: {
+                    "provider": e.provider,
+                    "model_id": e.model_id,
+                    "display_name": e.display_name,
+                    "is_available": e.is_available,
+                    "is_default": e.is_default,
+                    "priority": e.priority,
+                }
+                for key, e in self._models.items()
+            },
+        }
+
     def list_models(
         self,
         provider: Optional[str] = None,
-        available_only: bool = True,
+        available_only: bool = False,
         min_context: int = 0,
     ) -> list[ModelEntry]:
-        """List registered models with optional filtering."""
+        """List registered models with optional filtering.
+
+        Args:
+            provider: Filter by provider name
+            available_only: If True, only return available models.
+                          If False, return all configured models.
+            min_context: Minimum context length filter
+        """
         results = []
         for entry in self._models.values():
             if available_only and not entry.is_available:
@@ -148,6 +188,7 @@ class ModelRegistry:
                 ),
                 is_available=False,  # Will be detected at runtime
                 priority=10,
+                is_default=True,  # First registered model becomes default
             ),
             ModelEntry(
                 model_id="gpt-4o-mini",

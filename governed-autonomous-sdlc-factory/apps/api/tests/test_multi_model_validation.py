@@ -40,15 +40,32 @@ def test_model_registry():
     else:
         print("  ⚠ LM_STUDIO:local-model not found (may need configuration)")
 
-    # Test 3: Default model
-    print("  → Getting default model...")
-    default = registry.get_default()
-    if default:
-        print(f"  ✅ Default: {default.provider}:{default.model_id}")
+    # Test 3: Default model (configured default, even if unavailable)
+    print("  → Getting configured default model...")
+    configured_default = registry.get_configured_default()
+    if configured_default:
+        print(f"  ✅ Configured default: {configured_default.provider}:{configured_default.model_id}")
+        print(f"     Available: {configured_default.is_available}")
     else:
-        print("  ⚠ No default model set")
+        print("  ⚠ No configured default model")
 
-    # Test 4: List all models with capabilities
+    # Test 4: Available default (must be available to route)
+    print("  → Getting available default model...")
+    available_default = registry.get_default()
+    if available_default:
+        print(f"  ✅ Available default: {available_default.provider}:{available_default.model_id}")
+    else:
+        print("  ℹ No available default (all models are unconfigured/unavailable — expected in dev)")
+
+    # Test 5: Availability summary
+    print("  → Getting availability summary...")
+    summary = registry.get_availability_summary()
+    print(f"  ✅ Total: {summary['total']}, Available: {summary['available']}, Unavailable: {summary['unavailable']}")
+    assert summary['total'] == 4, f"Expected 4 default models, got {summary['total']}"
+    assert summary['available'] == 0, f"Expected 0 available (not health-checked yet), got {summary['available']}"
+    assert summary['unavailable'] == 4, f"Expected 4 unavailable, got {summary['unavailable']}"
+
+    # Test 6: List all models with capabilities
     print("  → Listing all models...")
     for m in models:
         print(f"  ✅ {m.provider}:{m.model_id} (ctx={m.capabilities.context_length})")
