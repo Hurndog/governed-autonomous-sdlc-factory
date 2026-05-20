@@ -26,7 +26,8 @@ def test_model_registry():
 
     # Test 1: Registry has models after loading defaults
     print("  → Loading default models...")
-    models = registry.list_models()
+    # Use available_only=False to see all registered models (defaults have is_available=False)
+    models = registry.list_models(available_only=False)
     assert len(models) > 0, f"Registry should have default models, got {len(models)}"
     print(f"  ✅ {len(models)} models registered")
 
@@ -35,7 +36,7 @@ def test_model_registry():
     entry = registry.get(ProviderType.LM_STUDIO.value, "local-model")
     if entry:
         print(f"  ✅ Found: {entry.provider}:{entry.model_id}")
-        print(f"     Capabilities: coding={entry.capabilities.coding_quality}, reasoning={entry.capabilities.reasoning_quality}")
+        print(f"     Capabilities: ctx={entry.capabilities.context_length}, streaming={entry.capabilities.supports_streaming}")
     else:
         print("  ⚠ LM_STUDIO:local-model not found (may need configuration)")
 
@@ -79,12 +80,12 @@ def test_capability_matching():
 
     # Test: Filter by provider
     print("  → Filtering by provider...")
-    ollama_models = registry.list_models(provider=ProviderType.LM_STUDIO.value)
+    ollama_models = registry.list_models(provider=ProviderType.LM_STUDIO.value, available_only=False)
     print(f"  ✅ {len(ollama_models)} LM Studio models")
 
     # Test: Filter by context length
     print("  → Filtering by context length...")
-    large_ctx = registry.list_models(min_context=8000)
+    large_ctx = registry.list_models(min_context=8000, available_only=False)
     print(f"  ✅ {len(large_ctx)} models with 8K+ context")
 
     print("  ✅ CAPABILITY MATCHING PASSED")
@@ -96,7 +97,7 @@ def test_model_entry_fields():
 
     registry = ModelRegistry()
     registry.load_defaults()
-    models = registry.list_models()
+    models = registry.list_models(available_only=False)
 
     if models:
         m = models[0]
