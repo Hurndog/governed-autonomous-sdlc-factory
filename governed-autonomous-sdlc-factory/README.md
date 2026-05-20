@@ -59,67 +59,56 @@ The Governed Autonomous SDLC Factory transforms natural language software specif
 ## Core Features
 
 ### 🧠 Multi-Model Cognitive Governance
-
 Dynamic model selection based on task type, governance requirements, sovereignty constraints, and cost budgets. Supports Ollama, OpenAI, Anthropic, Gemini, and OpenRouter.
 
 ### ⚖️ Cognitive Arbitration Engine
-
 Execute tasks across multiple models, analyze disagreement, and produce governed decisions. Disagreement is surfaced, never suppressed.
 
 ### 🔍 Explainability Engine
-
 Causal narratives grounded in actual database records. Eight explanation types: runtime, trust, drift, replay, governance, memory, interventions, autonomy.
 
 ### 🏛️ Governance Layer
-
 OPA Rego policies enforced at every layer. RBAC with 30+ granular permissions. Trust scores that affect autonomy levels.
 
 ### 🔒 Sovereignty-Aware Routing
-
 Five sovereignty levels from `local_only` to `frontier_only`. Control over where data is processed and which models are used.
 
 ### 📜 Evidence & Replay
-
 Immutable evidence bundles with hash-chained integrity. Deterministic replay of any previous run with tamper detection.
 
 ### 🛑 Operator Intervention
-
 Eight intervention types: pause, resume, quarantine, rollback, escalate, throttle, override, terminate. All recorded in the audit trail.
 
 ### 🧠 Memory Lifecycle
-
 Seven lifecycle states: active, stale, expired, archived, quarantined, pending_review, degraded. Archival preserves evidence links.
 
 ### 📊 Real-Time Telemetry
-
 SSE streams for live event telemetry. Prometheus metrics. Structured logging with trace correlation.
 
 ---
 
-## Architecture Overview
+## Documentation
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Frontend (Next.js 14 + TypeScript + Tailwind)          │
-│  35+ Room Components • SSE • WebSocket • Recharts       │
-└────────────────────────┬────────────────────────────────┘
-                         │ HTTP / SSE / WebSocket
-┌────────────────────────▼────────────────────────────────┐
-│  API Layer (FastAPI + Pydantic v2)                      │
-│  27+ Endpoint Modules • Middleware • SSE Streams        │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Engine Layer (17+ Specialized Engines)                 │
-│  Model Router • Arbitration • Governance • Replay       │
-│  Drift Control • Semantic Coverage • Evidence           │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Infrastructure                                         │
-│  PostgreSQL • Redis • Qdrant • Ollama • Prometheus      │
-└─────────────────────────────────────────────────────────┘
-```
+| Document | Description |
+|----------|-------------|
+| **[README.md](README.md)** | This file — overview and quickstart |
+| **[INSTALLATION.md](INSTALLATION.md)** | Complete installation + dependencies guide |
+| **[FUNCTIONAL.md](FUNCTIONAL.md)** | Functional descriptions + execution overviews |
+| **[TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md)** | Deep technical architecture |
+| **[RELEASES.md](RELEASES.md)** | Release notes per version |
+| **[Whitepaper](whitepaper/loveable-for-the-enterprise.md)** | 5000+ word technical whitepaper |
+| **[Architecture](docs/architecture/overview.md)** | Architecture diagrams (Mermaid) |
+| **[API Reference](docs/api/reference.md)** | Complete API endpoint reference |
+| **[Runtime](docs/runtime/index.md)** | Runtime lifecycle, trust, drift, replay |
+| **[Governance](docs/governance/index.md)** | Governance framework and policies |
+| **[Security](docs/security/architecture.md)** | Security architecture |
+| **[Deployment: Local](docs/deployment/local.md)** | Local installation guide |
+| **[Deployment: Docker](docs/deployment/docker.md)** | Docker deployment guide |
+| **[Deployment: VPS](docs/deployment/vps.md)** | VPS deployment guide |
+| **[Deployment: Apple Silicon](docs/deployment/apple-silicon.md)** | Apple Silicon optimized setup |
+| **[Examples](examples/README.md)** | Runnable example workflows |
+| **[Contributing](CONTRIBUTING.md)** | Contribution guidelines |
+| **[License](LICENSE)** | Apache 2.0 |
 
 ---
 
@@ -136,7 +125,7 @@ SSE streams for live event telemetry. Prometheus metrics. Structured logging wit
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/governed-autonomous-sdlc-factory.git
+git clone https://github.com/Hurndog/governed-autonomous-sdlc-factory.git
 cd governed-autonomous-sdlc-factory
 
 # 2. Configure
@@ -167,13 +156,42 @@ open http://localhost:3000
 ### Docker Quick Start
 
 ```bash
-git clone https://github.com/your-org/governed-autonomous-sdlc-factory.git
+git clone https://github.com/Hurndog/governed-autonomous-sdlc-factory.git
 cd governed-autonomous-sdlc-factory
 cp .env.example .env
 docker-compose up -d
 docker-compose exec api python -m alembic upgrade head
 open http://localhost:3000
 ```
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Frontend (Next.js 14 + TypeScript + Tailwind)          │
+│  35+ Room Components • SSE • WebSocket • Recharts       │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTP / SSE / WebSocket
+┌────────────────────────▼────────────────────────────────┐
+│  API Layer (FastAPI + Pydantic v2)                      │
+│  27+ Endpoint Modules • Middleware • SSE Streams        │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Engine Layer (17+ Specialized Engines)                 │
+│  Model Router • Arbitration • Governance • Replay       │
+│  Drift Control • Semantic Coverage • Evidence           │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Infrastructure                                         │
+│  PostgreSQL • Redis • Qdrant • Ollama • Prometheus      │
+└─────────────────────────────────────────────────────────┘
+```
+
+See [TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md) for detailed architecture.
 
 ---
 
@@ -197,17 +215,6 @@ open http://localhost:3000
 
 ---
 
-## Supported Local Models
-
-| Model | Size | Speed (M4 Max) | Best For |
-|-------|------|----------------|----------|
-| phi3:mini | 2.3GB | ~80 tok/s | Fast reasoning |
-| qwen2.5-coder:7b | 4.7GB | ~55 tok/s | Code generation |
-| llama3.1:8b | 4.7GB | ~50 tok/s | General purpose |
-| deepseek-r1:7b | 4.7GB | ~45 tok/s | Deep reasoning |
-
----
-
 ## Key URLs
 
 | Service | URL |
@@ -218,38 +225,6 @@ open http://localhost:3000
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3001 |
 | Qdrant Dashboard | http://localhost:6333/dashboard |
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Whitepaper](whitepaper/loveable-for-the-enterprise.md) | 5000+ word technical whitepaper |
-| [Architecture](docs/architecture/overview.md) | System architecture with Mermaid diagrams |
-| [API Reference](docs/api/reference.md) | Complete API endpoint reference |
-| [Runtime](docs/runtime/index.md) | Runtime lifecycle, trust scoring, drift detection |
-| [Governance](docs/governance/index.md) | Governance framework and policies |
-| [Security](docs/security/architecture.md) | Security architecture and best practices |
-| [Local Deployment](docs/deployment/local.md) | Local installation guide |
-| [Docker Deployment](docs/deployment/docker.md) | Docker deployment guide |
-| [VPS Deployment](docs/deployment/vps.md) | VPS deployment guide |
-| [Apple Silicon](docs/deployment/apple-silicon.md) | Apple Silicon optimized setup |
-| [Examples](examples/README.md) | Runnable example workflows |
-
----
-
-## Example Workflows
-
-- **Finance** — Automated report generation with sovereign-required routing
-- **Invoice Processing** — Multi-model extraction with disagreement detection
-- **Governance Escalation** — Automatic escalation on trust degradation
-- **Multi-Model Arbitration** — Parallel execution with consensus analysis
-- **Memory Archival** — Lifecycle management with evidence preservation
-- **Intervention Scenario** — Pause, quarantine, rollback, resume
-- **Trust Degradation** — Trust score changes and autonomy adjustment
-
-See [examples/](examples/README.md) for details.
 
 ---
 
@@ -286,6 +261,23 @@ See [examples/](examples/README.md) for details.
 - `POST /api/v1/interventions/rollback` — Rollback
 
 See [API Reference](docs/api/reference.md) for complete documentation.
+
+---
+
+## Release History
+
+| Version | Date | Description |
+|---------|------|-------------|
+| [v0.1.0](RELEASES.md#v010--open-enterprise-release-2025-05-20) | 2025-05-20 | Open Enterprise Release — complete docs, deployment, whitepaper |
+| [v0.5](RELEASES.md#v05--multi-model-cognitive-governance-2025-05-19) | 2025-05-19 | Multi-Model Cognitive Governance — router, arbitration, sovereignty |
+| [v0.4](RELEASES.md#v04--enterprise-cognitive-operations-2025-05-19) | 2025-05-19 | Enterprise Cognitive Operations — monitoring, interventions, explainability |
+| [v0.3.5](RELEASES.md#v035--integration-integrity-hardened-2025-05-17) | 2025-05-17 | Integration Integrity Hardened — drift control, metacognitive |
+| [v0.3.3](RELEASES.md#v033--concurrency-stable-runtime-2025-05-16) | 2025-05-16 | Concurrency Stable — 25/25 stability, 5/5 tamper detection |
+| [v0.3](RELEASES.md#v03--governed-runtime-observability-baseline-2025-05-15) | 2025-05-15 | Observability Baseline — 6 LIVE upgrades |
+| [v0.2.0](RELEASES.md#v020--evidence-backed-runtime-2025-05-14) | 2025-05-14 | Evidence-Backed Runtime — PASS baseline |
+| [v0.1.0](RELEASES.md#v010--golden-integrity-runtime-2025-05-14) | 2025-05-14 | Golden Integrity Runtime — initial baseline |
+
+See [RELEASES.md](RELEASES.md) for detailed release notes.
 
 ---
 
