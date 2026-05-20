@@ -149,17 +149,17 @@ class DriftDetectionEngine:
 
     def detect_goal_drift(self, project_id: str) -> Dict[str, Any]:
         result = self.db.execute(text("""
-            SELECT intent FROM runs WHERE project_id = :pid ORDER BY created_at DESC LIMIT 10
+            SELECT name FROM runs WHERE project_id = :pid ORDER BY created_at DESC LIMIT 10
         """), {"pid": project_id})
-        intents = [r[0] for r in result.fetchall() if r[0]]
-        if len(intents) < 2:
-            return {"drift_detected": False, "score": 0.0, "reason": "Insufficient intents"}
-        orig = set(intents[-1].lower().split())
-        recent = set(intents[0].lower().split())
+        names = [r[0] for r in result.fetchall() if r[0]]
+        if len(names) < 2:
+            return {"drift_detected": False, "score": 0.0, "reason": "Insufficient run names"}
+        orig = set(names[-1].lower().split())
+        recent = set(names[0].lower().split())
         overlap = len(orig & recent) / len(orig) if orig else 1.0
         score = 1.0 - overlap
         return {"drift_detected": score > DRIFT_CATEGORIES["goal"]["default_threshold"],
-                "score": score, "intent_overlap": overlap}
+                "score": score, "name_overlap": overlap}
 
     def run_full_drift_scan(self, project_id: str) -> Dict[str, Any]:
         results = {}

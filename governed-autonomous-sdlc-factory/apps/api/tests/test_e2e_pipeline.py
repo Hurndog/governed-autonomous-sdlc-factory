@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.core.sync_database import SyncSessionLocal, sync_engine
 from src.core.config import settings
 from src.core.safety_guards import SafetyGuard, GuardStatus
+from sqlalchemy import text
 from src.models import Artifact
 from src.core.models_semantic_coverage import (
     SemanticCoverageReport, MutationTest, TestObligation,
@@ -81,6 +82,38 @@ def test_semantic_coverage_engine():
     run_id = str(uuid.uuid4())
 
     try:
+        # Create the run record first (required for FK constraint)
+        now = datetime.now(timezone.utc)
+        # Get or create a project for this run
+        result = db.execute(text("SELECT id FROM projects LIMIT 1"))
+        proj = result.fetchone()
+        if not proj:
+            ws_result = db.execute(text("SELECT id FROM workspaces LIMIT 1"))
+            ws = ws_result.fetchone()
+            ws_id = ws[0] if ws else str(uuid.uuid4())
+            if not ws:
+                db.execute(text(
+                    "INSERT INTO workspaces (id, name, slug, created_at, updated_at) "
+                    "VALUES (:id, :name, :slug, :ca, :ua)"
+                ), {"id": ws_id, "name": "Test WS", "slug": "test-ws", "ca": now, "ua": now})
+                db.commit()
+            pid = str(uuid.uuid4())
+            db.execute(text(
+                "INSERT INTO projects (id, name, slug, status, workspace_id, created_at, updated_at) "
+                "VALUES (:id, :name, :slug, 'active', :ws, :ca, :ua)"
+            ), {"id": pid, "name": "E2E Test", "slug": "e2e-test", "ws": ws_id, "ca": now, "ua": now})
+            db.commit()
+        else:
+            pid = proj[0]
+
+        db.execute(text(
+            "INSERT INTO runs (id, project_id, name, status, is_demo, total_cost, "
+            " budget_limit, created_at, updated_at) "
+            "VALUES (:id, :pid, :name, 'running', false, 0, 1000, :ca, :ua)"
+        ), {"id": run_id, "pid": pid, "name": "E2E Pipeline Test",
+            "ca": now, "ua": now})
+        db.commit()
+
         # Create test artifacts
         requirements_data = [
             {"id": "REQ-001", "description": "Users SHALL authenticate with JWT tokens", "priority": "must_have", "complexity": "medium"},
