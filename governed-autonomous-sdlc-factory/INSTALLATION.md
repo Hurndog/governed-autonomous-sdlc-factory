@@ -201,7 +201,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_WS_URL=ws://localhost:8000
 ```
 
-### Step 7: Start Backend
+### Step 5: Start Backend
 
 ```bash
 cd apps/api
@@ -216,6 +216,14 @@ INFO:     Starting Governed Autonomous SDLC Factory API
 INFO:     Database initialized
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+### Step 6: Run Tests (Optional but Recommended)
+
+```bash
+cd apps/api
+python -m pytest tests/ -q
+# Expected: 128 passed
 ```
 
 ---
@@ -436,8 +444,7 @@ open http://localhost:8000/docs
 # Run tests
 cd apps/api
 python -m pytest tests/ -v
-# Expected: 125/127 passed (2 pre-existing failures)
-```
+# Expected: 128/128 passed
 
 ### Frontend Verification
 

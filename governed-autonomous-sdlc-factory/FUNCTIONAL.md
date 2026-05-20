@@ -1,12 +1,7 @@
 # Functional Description & Execution Overviews
 
-## Table of Contents
-
-1. [Platform Capabilities](#1-platform-capabilities)
-2. [Execution Overviews](#2-execution-overviews)
-3. [Module Functional Descriptions](#3-module-functional-descriptions)
-4. [User Workflows](#4-user-workflows)
-5. [Data Flow](#5-data-flow)
+**Last updated:** 2025-05-20
+**Validated against:** 128/128 backend tests PASS, full pipeline execution test, TypeScript 0 errors
 
 ---
 
@@ -14,35 +9,37 @@
 
 ### What the Platform Does
 
-The Governed Autonomous SDLC Factory transforms natural language software specifications into complete, tested, documented, and deployed applications. Every step is governed, observable, auditable, and replayable.
+The Governed Autonomous SDLC Factory executes software development lifecycle phases — from natural language specification through planning, implementation, verification, and release gating. Every step is governed, observable, auditable, and replayable.
 
 ### Capability Matrix
 
 | Capability | Status | Since | Description |
 |------------|--------|-------|-------------|
-| Pipeline Execution | ✅ | v0.2 | Execute SDLC phases from spec to deployment |
-| Semantic Coverage | ✅ | v0.2 | Score completeness of implementation vs spec |
-| Release Gating | ✅ | v0.2 | Block releases below quality threshold |
-| Integrity Scoring | ✅ | v0.2 | 7-component integrity score |
-| Safety Guards | ✅ | v0.2 | 11 types of safety checks |
-| Conflict Detection | ✅ | v0.2 | 4 conflict pattern types |
-| Evidence Capture | ✅ | v0.2 | Capture all actions as evidence |
-| Backup & Restore | ✅ | v0.2 | Full system backup and restore |
-| Deterministic Replay | ✅ | v0.2 | Reconstruct any previous run |
-| Authentication | ✅ | v0.3 | JWT-based auth with RBAC |
-| Authorization | ✅ | v0.3 | 30+ granular permissions |
-| Audit Trail | ✅ | v0.3 | Immutable audit log |
-| Drift Detection | ✅ | v0.3.4 | Detect cognitive drift |
-| Metacognitive Control | ✅ | v0.3.4 | Self-monitoring and adjustment |
-| Persistent Memory | ✅ | v0.3.4 | 85+ table database |
-| Operations Monitoring | ✅ | v0.4 | Real-time health dashboard |
-| SSE Telemetry | ✅ | v0.4 | Live event streaming |
-| Operator Interventions | ✅ | v0.4 | 8 intervention types |
-| Memory Lifecycle | ✅ | v0.4 | 7 lifecycle states |
-| Explainability | ✅ | v0.4 | 8 explanation types |
-| Multi-Model Routing | ✅ | v0.5 | Dynamic model selection |
-| Cognitive Arbitration | ✅ | v0.5 | Multi-model disagreement analysis |
-| Sovereignty Routing | ✅ | v0.5 | Data sovereignty constraints |
+| Pipeline Execution | ✅ Operational | v0.2 | Execute SDLC phases from spec to deployment |
+| Semantic Coverage | ✅ Operational | v0.2 | Score completeness of implementation vs spec |
+| Release Gating | ✅ Operational | v0.2 | Block releases below quality threshold |
+| Integrity Scoring | ✅ Operational | v0.2 | 7-component integrity score |
+| Safety Guards | ✅ Operational | v0.2 | 11 types of safety checks |
+| Conflict Detection | ✅ Operational | v0.2 | 4 conflict pattern types |
+| Evidence Capture | ✅ Operational | v0.2 | Capture all actions as evidence |
+| Backup & Restore | ✅ Operational | v0.2 | Full system backup and restore |
+| Deterministic Replay | ✅ Operational | v0.2 | Reconstruct any previous run |
+| Authentication | ✅ Operational | v0.3 | JWT-based auth with RBAC |
+| Authorization | ✅ Operational | v0.3 | 30+ granular permissions |
+| Audit Trail | ✅ Operational | v0.3 | Immutable audit log with hash chains |
+| Drift Detection | ✅ Operational | v0.3.4 | 6 drift dimensions |
+| Metacognitive Control | ✅ Operational | v0.3.4 | Self-monitoring and adjustment |
+| Persistent Memory | ✅ Operational | v0.3.4 | 85+ table database |
+| Operations Monitoring | ✅ Operational | v0.4 | Real-time health dashboard |
+| SSE Telemetry | ✅ Operational | v0.4 | Live event streaming |
+| Operator Interventions | ✅ Operational | v0.4 | 8 intervention types |
+| Memory Lifecycle | ✅ Operational | v0.4 | 7 lifecycle states |
+| Explainability | ✅ Operational | v0.4 | 8 explanation types |
+| Multi-Model Routing | ✅ Operational | v0.5 | Dynamic model selection |
+| Cognitive Arbitration | ⚠️ Partial | v0.5 | Engine exists, limited real-provider testing |
+| Sovereignty Routing | ⚠️ Partial | v0.5 | 5 levels defined, edge cases untested |
+| Mutation Execution | ✅ Operational | v0.5.1 | Plan → execute → score pipeline |
+| Full Pipeline E2E | ✅ Operational | v0.5.1 | Complete SDLC pipeline test PASS |
 
 ---
 
@@ -57,47 +54,53 @@ User Input (Natural Language)
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. SPECIFICATION PHASE                                       │
 │    - Parse natural language → structured specification       │
-│    - Extract requirements                                   │
-│    - Validate specification completeness                     │
+│    - Extract requirements (RequirementNormalization)         │
+│    - Create test obligations (TestObligation)                │
+│    - Persist specification artifact                          │
 │    - Output: Structured specification + requirements         │
 └─────────────────────────┬───────────────────────────────────┘
                           │ Governance Gate
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. PLANNING PHASE                                            │
-│    - Generate execution plan                                │
-│    - Design architecture                                   │
-│    - Select models (CognitiveModelRouter)                   │
-│    - Estimate costs                                        │
-│    - Output: Execution plan + architecture                   │
+│    - Generate architecture decisions                         │
+│    - Persist architecture artifacts                           │
+│    - Output: Architecture decisions + plan                   │
 └─────────────────────────┬───────────────────────────────────┘
                           │ Governance Gate
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. IMPLEMENTATION PHASE                                      │
-│    - Generate code (multi-model)                            │
-│    - Run arbitration if multiple models                     │
-│    - Capture evidence of all model calls                    │
-│    - Detect drift and hallucinations                        │
-│    - Output: Implementation + evidence                       │
+│ 3. SEMANTIC COVERAGE PHASE                                   │
+│    - Plan mutation tests (plan_mutation_tests)               │
+│    - Execute mutation tests (execute_mutation_tests)         │
+│    - Compute mutation score (execute_mutation)               │
+│    - Create SemanticCoverageReport                           │
+│    - Output: Coverage report + mutation score                │
 └─────────────────────────┬───────────────────────────────────┘
                           │ Governance Gate
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. VERIFICATION PHASE                                        │
-│    - Run tests                                             │
-│    - Compute semantic coverage score                        │
-│    - Compute integrity score                               │
-│    - Validate against requirements                          │
-│    - Output: Test results + coverage + integrity             │
+│ 4. GOVERNANCE EVALUATION                                     │
+│    - Evaluate governance policies                            │
+│    - Compute trust score                                     │
+│    - Check drift status                                      │
+│    - Output: Governance verdict + trust score                │
 └─────────────────────────┬───────────────────────────────────┘
                           │ Governance Gate
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 5. RELEASE GATE                                              │
-│    - Evaluate all quality thresholds                        │
-│    - Check governance policies                              │
-│    - Generate evidence bundle                               │
+│ 5. EVIDENCE & REPLAY                                         │
+│    - Capture all events as evidence                          │
+│    - Create evidence bundle artifact                         │
+│    - Generate replay snapshots                               │
+│    - Output: Evidence bundle + replay data                   │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. RELEASE GATE                                              │
+│    - Evaluate all quality thresholds                         │
+│    - Check governance policies                               │
 │    - PASS → Release / BLOCK → Return to implementation      │
 │    - Output: Release verdict + evidence bundle               │
 └─────────────────────────────────────────────────────────────┘
@@ -121,7 +124,7 @@ Task Request
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. QUERY CAPABILITY REGISTRY                                 │
-│    - Get all registered models                              │
+│    - Get all registered models (ModelRegistry.list_models)   │
 │    - Filter by availability (health check)                  │
 │    - Filter by sovereignty (eliminate violating models)     │
 │    - Filter by governance (eliminate insufficient models)   │
@@ -129,64 +132,54 @@ Task Request
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. SCORE CANDIDATES                                          │
-│    - Weighted capability matching                           │
-│    - Apply trust weights                                    │
-│    - Apply cost constraints                                 │
-│    - Apply latency constraints                              │
-│    - Rank remaining candidates                              │
+│ 3. SELECT MODEL                                              │
+│    - _select_model() picks best match from registry          │
+│    - Apply RoutingPolicy constraints                         │
+│    - Build fallback chain                                    │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. SELECT + RECORD                                           │
-│    - Select top-ranked model                                │
-│    - Build fallback chain                                   │
-│    - Record routing decision with reasoning                 │
-│    - Record rejected models with reasons                    │
-│    - Return RoutingDecision                                 │
+│ 4. EXECUTE WITH FALLBACK                                     │
+│    - _execute_with_fallback() tries primary model            │
+│    - On failure, tries fallback chain                        │
+│    - Records InferenceTrace for every attempt               │
+│    - Returns InferenceResult                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Arbitration Execution
+### 2.3 Mutation Execution
 
 ```
-Task Requires Arbitration
+execute_mutation(run_id) → float
     │
     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. SELECT MODELS                                             │
-│    - Choose N models based on task type                     │
-│    - Ensure diversity (different providers/architectures)    │
-│    - Check all models are healthy                           │
+│ 1. PLAN MUTATIONS                                            │
+│    - Query RequirementNormalization for critical reqs        │
+│    - For each req × mutation_type, create MutationTest       │
+│    - 5 mutation types: boundary_shift, null_injection,      │
+│      type_confusion, logic_inversion, off_by_one             │
+│    - Deterministic upsert by (run_id, mutation_id)           │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. PARALLEL EXECUTION                                        │
-│    - Execute task on all N models simultaneously            │
-│    - Collect outputs with latency metrics                   │
-│    - Handle failures gracefully (don't fail all if 1 fails) │
+│ 2. EXECUTE MUTATIONS                                         │
+│    - For each planned MutationTest:                          │
+│      a. Load proof_statement from TestObligation             │
+│      b. Apply mutation to code (_apply_mutation)             │
+│      c. Write mutated code to temp file                      │
+│      d. Run mutated code via subprocess (30s timeout)        │
+│      e. Record: killed (test failed) / survived (passed)     │
+│    - Max 50 mutations per run                                │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. ANALYZE DISAGREEMENT                                      │
-│    - Compute pairwise semantic similarity                   │
-│    - Detect direct contradictions                           │
-│    - Categorize divergence (semantic, governance, replay)   │
-│    - Compute consensus score                                │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. ARBITRATE                                                 │
-│    - Apply trust weights to each model's output             │
-│    - Compute weighted consensus                             │
-│    - If consensus ≥ threshold: accept                       │
-│    - If consensus < threshold: escalate                     │
-│    - If contradiction > threshold: human review             │
-│    - Record all outputs (never suppress disagreement)       │
+│ 3. SCORE                                                     │
+│    - mutation_score = killed / total_executed                │
+│    - Returns float 0.0 - 1.0                                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -205,30 +198,21 @@ Operator Initiates Intervention
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. CONFIRM                                                   │
-│    - Require operator reasoning                             │
-│    - Show impact preview                                    │
-│    - Require explicit confirmation                          │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. EXECUTE INTERVENTION                                      │
-│    - Pause: Set run state to PAUSED, preserve state         │
-│    - Resume: Restore from PAUSED, continue execution        │
+│ 2. EXECUTE INTERVENTION                                      │
+│    - Pause: Set run state to PAUSED                          │
+│    - Resume: Restore from PAUSED                             │
 │    - Quarantine: Isolate run, prevent further execution     │
 │    - Rollback: Revert to previous snapshot                  │
 │    - Escalate: Increase governance scrutiny level           │
-│    - Throttle: Reduce execution speed / model usage         │
+│    - Throttle: Reduce execution speed                       │
 │    - Override: Manually set a decision parameter            │
 │    - Terminate: Stop execution immediately                  │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. RECORD + PROPAGATE                                        │
-│    - Record in immutable audit trail                        │
-│    - Assess trust impact                                    │
+│ 3. RECORD + PROPAGATE                                        │
+│    - Record in immutable audit trail (operator_interventions)│
 │    - Broadcast SSE event to all connected clients           │
 │    - Update frontend in real-time                           │
 └─────────────────────────────────────────────────────────────┘
@@ -241,14 +225,7 @@ Explanation Request (type, target_id)
     │
     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. IDENTIFY TARGET                                           │
-│    - Load target (run, phase, decision, model, etc.)        │
-│    - Determine required evidence types                      │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. RETRIEVE EVIDENCE                                         │
+│ 1. IDENTIFY TARGET + RETRIEVE EVIDENCE                       │
 │    - Query evidence_bundles for target                      │
 │    - Query log_events for causal chain                      │
 │    - Query trust_records for trust context                  │
@@ -258,7 +235,7 @@ Explanation Request (type, target_id)
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. BUILD CAUSAL CHAIN                                        │
+│ 2. BUILD CAUSAL CHAIN                                        │
 │    - Order events chronologically                           │
 │    - Link cause → effect                                    │
 │    - Identify decision points                               │
@@ -267,21 +244,13 @@ Explanation Request (type, target_id)
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. ASSESS UNCERTAINTY                                        │
+│ 3. ASSESS UNCERTAINTY + GENERATE NARRATIVE                   │
 │    - Identify gaps in evidence                              │
 │    - Mark claims without DB backing                         │
-│    - Compute confidence score                               │
-│    - Generate uncertainty disclosures                       │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 5. GENERATE NARRATIVE                                        │
 │    - Construct human-readable explanation                   │
 │    - Ground every claim in specific DB records              │
-│    - Include uncertainty disclosures                        │
+│    - Add uncertainty disclosures                            │
 │    - Add recommendations                                    │
-│    - Return ExplanationResponse                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -289,286 +258,195 @@ Explanation Request (type, target_id)
 
 ## 3. Module Functional Descriptions
 
-### 3.1 CognitiveModelRouter
+### 3.1 SemanticCoverageEngine
 
-**Purpose:** Dynamically select the optimal AI model for each task.
+**Purpose:** Compute semantic coverage, plan and execute mutation tests.
 
-**Inputs:**
-- Task type (code_generation, architecture_reasoning, etc.)
-- Required capabilities (coding_quality, reasoning_quality, etc.)
-- Governance level (trust threshold, policy requirements)
-- Sovereignty requirement (local_only, hybrid, etc.)
-- Cost budget (maximum cost per task)
-- Latency budget (maximum response time)
-- Context size (tokens needed)
+**Location:** `apps/api/src/engines/semantic_coverage_engine.py` (1229 lines, 31 functions)
 
-**Processing:**
-1. Query ModelCapabilityRegistry for all available models
-2. Filter by sovereignty constraints
-3. Filter by governance requirements
-4. Score remaining models using weighted capability matching
-5. Apply cost and latency constraints
-6. Rank candidates
-7. Build fallback chain
+**Key methods:**
+- `plan_mutation_tests(run_id) → List[MutationTest]` — creates mutation test plans for critical requirements
+- `execute_mutation_tests(run_id) → List[MutationTest]` — executes planned mutations, records killed/survived
+- `execute_mutation(run_id) → float` — convenience method: plan + execute + score
 
-**Outputs:**
-- Selected model + provider
-- Routing reasoning
-- Rejected models with reasons
-- Trust score, governance score, sovereignty score
-- Cost estimate
-- Fallback chain
+**Mutation types:** boundary_shift, null_injection, type_confusion, logic_inversion, off_by_one
 
-**Error Handling:**
-- If no model matches: return error with explanation
-- If primary model fails: auto-fallback to next in chain
-- If all models fail: escalate to operator
+**Scoring:** `killed / total_executed` — fraction of mutations detected by tests
 
-### 3.2 CognitiveArbitrationEngine
+### 3.2 CognitiveModelRouter
 
-**Purpose:** Execute tasks across multiple models and analyze disagreement.
+**Purpose:** Route inference requests to appropriate models based on capabilities, sovereignty, cost.
 
-**Inputs:**
-- Task specification
-- Set of models to execute
-- Arbitration threshold (minimum consensus)
-- Trust weights per model
+**Location:** `apps/api/src/engines/model_router.py` (406 lines, 11 functions)
 
-**Processing:**
-1. Execute task on all models in parallel
-2. Normalize outputs to common format
-3. Compute pairwise semantic similarity
-4. Detect direct contradictions
-5. Categorize divergence types
-6. Apply trust weights
-7. Compute consensus score
-8. Determine if escalation is needed
+**Key methods:**
+- `complete(messages, model, provider, policy, ...) → InferenceResult` — main inference entry point
+- `_select_model(provider, policy) → ModelEntry` — internal model selection
+- `_execute_with_fallback(entry, provider, messages) → InferenceResult` — execution with fallback chain
 
-**Outputs:**
-- All model outputs (preserved, never suppressed)
-- Consensus score (0.0 - 1.0)
-- Contradiction score (0.0 - 1.0)
-- Divergence categories
-- Arbitration decision
-- Escalation flag
-- Human review flag
+**Routing policy:** `RoutingPolicy(prefer_local, max_cost, min_context, fallback_enabled, max_retries)`
 
-**Error Handling:**
-- If one model fails: continue with remaining models
-- If all models fail: return error with partial results
-- If disagreement exceeds threshold: escalate automatically
+### 3.3 DriftDetectionEngine
 
-### 3.3 DriftControlEngine
+**Purpose:** Detect cognitive drift across 6 dimensions.
 
-**Purpose:** Detect and respond to cognitive drift in the runtime.
+**Location:** `apps/api/src/engines/drift_control_engine.py` (415 lines)
 
-**Inputs:**
-- Current model outputs
-- Historical model outputs
-- Goal specification
-- Drift thresholds per dimension
+**Key methods:**
+- `detect_semantic_drift(project_id)` — embedding distance analysis
+- `detect_governance_drift(project_id)` — policy compliance trend
+- `detect_cost_drift(project_id)` — budget anomaly detection
+- `detect_evidence_drift(project_id)` — evidence quality degradation
+- `detect_context_drift(project_id)` — context window drift
+- `detect_cognitive_drift(project_id)` — cognitive behavior change
+- `detect_goal_drift(project_id)` — intent comparison
+- `run_full_drift_scan(project_id)` — all dimensions
 
-**Processing:**
-1. Compare current outputs to historical baseline
-2. Compute semantic drift (embedding distance)
-3. Compute goal drift (intent comparison)
-4. Compute trust drift (statistical process control)
-5. Compute governance drift (policy compliance trend)
-6. Categorize drift severity (low, medium, high, critical)
-7. Trigger appropriate response
+### 3.4 RuntimeTrustScorer
 
-**Outputs:**
-- Drift detection results per dimension
-- Severity assessment
-- Recommended response
-- Metacognitive state update
+**Purpose:** Compute trust scores from 5 components.
 
-**Error Handling:**
-- If baseline insufficient: request more data
-- If drift critical: trigger quarantine
-- If drift high: increase scrutiny
+**Location:** `apps/api/src/engines/drift_control_engine.py` (lines 320-415)
 
-### 3.4 GovernanceEngine
+**Components:** historical accuracy (0.30), hallucination rate (0.25), replay stability (0.20), governance compliance (0.15), operator feedback (0.10)
 
-**Purpose:** Evaluate and enforce governance policies.
+**Key methods:**
+- `compute_trust_scores(project_id) → Dict` — compute all trust components
+- `persist_trust_scores(project_id, workspace_id, scores) → List[str]` — persist to DB
 
-**Inputs:**
-- Action request
-- Actor identity and permissions
-- Current trust score
-- Current governance state
-- Policy definitions (OPA Rego)
+### 3.5 ReplayIntegrityVerifier
 
-**Processing:**
-1. Evaluate RBAC permissions
-2. Check trust score against threshold
-3. Evaluate OPA Rego policies
-4. Check sovereignty constraints
-5. Check cost budget
-6. Record governance decision
+**Purpose:** Verify replay integrity via hash chains.
 
-**Outputs:**
-- Allow / Block decision
-- Reasoning (which policies applied)
-- Trust impact assessment
-- Audit trail entry
+**Location:** `apps/api/src/engines/drift_control_engine.py` (lines 188-228)
 
-### 3.5 ExplainabilityEngine
+**Key methods:**
+- `verify_replay_integrity(replay_session_id) → Dict` — verify hash chain, detect tampering
+
+### 3.6 MetacognitiveController
+
+**Purpose:** Self-monitoring and operator intervention recording.
+
+**Location:** `apps/api/src/engines/drift_control_engine.py` (lines 230-318)
+
+**Key methods:**
+- `evaluate_runtime_state(project_id, drift_report) → Dict` — evaluate runtime health
+- `apply_metacognitive_state(project_id, workspace_id, ...)` — apply metacognitive adjustments
+- `record_operator_intervention(project_id, workspace_id, ...)` — record operator actions
+
+### 3.7 FullPipelineOrchestrator
+
+**Purpose:** Coordinate SDLC phase execution.
+
+**Location:** `apps/api/src/services/full_pipeline_orchestrator.py` (647 lines, 10 functions)
+
+**Phases:** specification → planning → implementation → verification → release gating
+
+### 3.8 ExplainabilityEngine (endpoints)
 
 **Purpose:** Generate causal explanations grounded in evidence.
 
-**Inputs:**
-- Explanation type (runtime, trust, drift, replay, governance, memory, interventions, autonomy)
-- Target ID (run, phase, decision, etc.)
-- Time range
+**Location:** `apps/api/src/api/v1/endpoints/explainability.py` (970 lines, 12 classes, 19 functions)
 
-**Processing:**
-1. Identify target and required evidence types
-2. Query evidence bundles, log events, trust records
-3. Build causal chain from events
-4. Assess evidence completeness
-5. Generate uncertainty disclosures
-6. Construct grounded narrative
-7. Add recommendations
+**Explanation types:** runtime, trust, drift, replay, governance, memory, interventions, autonomy
 
-**Outputs:**
-- Causal chain (ordered events with links)
-- Evidence summary (which records support which claims)
-- Uncertainty disclosures (what we don't know)
-- Recommendations (what to do next)
-- Confidence score
+**Key endpoints:**
+- `GET /api/v1/explain/runtime/{run_id}` — runtime explanation
+- `GET /api/v1/explain/trust/{run_id}` — trust explanation
+- `GET /api/v1/explain/drift/{run_id}` — drift explanation
+- `GET /api/v1/explain/replay/{run_id}` — replay explanation
+- `GET /api/v1/explain/governance/{run_id}` — governance explanation
+- `GET /api/v1/explain/memory/{run_id}` — memory explanation
+- `GET /api/v1/explain/interventions/{run_id}` — intervention explanation
+- `GET /api/v1/explain/autonomy/{run_id}` — autonomy explanation
 
-### 3.6 MemoryLifecycleManager
+### 3.9 MemoryLifecycleManager (endpoints)
 
-**Purpose:** Manage the full lifecycle of cognitive memory.
+**Purpose:** Manage memory lifecycle states.
 
-**Inputs:**
-- Memory entries
-- Lifecycle policies (aging thresholds, archival rules)
-- Operator commands (archive, restore, quarantine)
+**Location:** `apps/api/src/api/v1/endpoints/memory_lifecycle.py` (601 lines, 3 classes, 11 functions)
 
-**Processing:**
-1. Apply aging policies to active entries
-2. Transition stale entries to expired
-3. Archive entries per policy
-4. Preserve evidence links during archival
-5. Handle quarantine and restore
-6. Track all transitions in audit trail
+**Lifecycle states:** active, stale, expired, archived, quarantined, pending_review, degraded
 
-**Outputs:**
-- Updated memory entries with new lifecycle states
-- Audit trail of transitions
-- Evidence link preservation verification
+**Key endpoints:**
+- `GET /api/v1/memory` — list memory entries
+- `POST /api/v1/memory/age` — trigger aging
+- `POST /api/v1/memory/archive` — archive entries
+- `POST /api/v1/memory/quarantine` — quarantine entries
+- `POST /api/v1/memory/restore` — restore archived entries
 
-### 3.7 ReplayEngine
+### 3.10 OperatorInterventionManager (endpoints)
 
-**Purpose:** Deterministically reconstruct any previous run.
+**Purpose:** Execute operator interventions.
 
-**Inputs:**
-- Run ID
-- Phase filter (optional)
-- Snapshot sequence
+**Location:** `apps/api/src/api/v1/endpoints/operator_intervention.py` (569 lines, 3 classes, 11 functions)
 
-**Processing:**
-1. Load snapshot sequence for the run
-2. Verify hash chain integrity
-3. Reconstruct run state at each phase
-4. Bind evidence bundles
-5. Report any discrepancies
+**Intervention types:** pause, resume, quarantine, rollback, escalate, throttle, override, terminate
 
-**Outputs:**
-- Reconstructed run with full state at each phase
-- Integrity verification result
-- Evidence binding
-- Discrepancy report (if any)
+**Key endpoints:**
+- `POST /api/v1/interventions/pause` — pause execution
+- `POST /api/v1/interventions/resume` — resume execution
+- `POST /api/v1/interventions/quarantine` — quarantine run
+- `POST /api/v1/interventions/rollback` — rollback to snapshot
+- `POST /api/v1/interventions/escalate` — escalate scrutiny
+- `POST /api/v1/interventions/throttle` — throttle execution
+- `POST /api/v1/interventions/override` — override decision
+- `POST /api/v1/interventions/terminate` — terminate execution
+- `GET /api/v1/interventions/history` — intervention history
 
-### 3.8 OperatorInterventionManager
+### 3.11 OperationsCenter (endpoints)
 
-**Purpose:** Execute operator interventions on running executions.
+**Purpose:** Real-time operations monitoring.
 
-**Inputs:**
-- Intervention type (pause, resume, quarantine, rollback, escalate, throttle, override, terminate)
-- Target run ID
-- Operator identity
-- Reasoning
+**Location:** `apps/api/src/api/v1/endpoints/operations.py` (560 lines, 6 classes, 19 functions)
 
-**Processing:**
-1. Authenticate operator
-2. Authorize intervention permission
-3. Validate target exists and is intervenable
-4. Execute intervention
-5. Record in audit trail
-6. Assess trust impact
-7. Broadcast SSE event
+**Key endpoints:**
+- `GET /api/v1/operations/summary` — system health summary (8 dimensions)
+- `GET /api/v1/operations/events` — event log (filterable)
+- `GET /api/v1/operations/events/stream` — SSE telemetry stream
 
-**Outputs:**
-- Intervention result
-- Audit trail entry
-- Trust impact assessment
-- SSE event
+### 3.12 GovernanceEngine
+
+**Purpose:** Evaluate governance policies.
+
+**Location:** `apps/api/src/engines/governance_engine.py` (251 lines, 2 classes, 3 functions)
+
+**Key methods:**
+- `generate_governance(project_id, workspace_id, spec)` — generate governance policies
 
 ---
 
-## 4. User Workflows
+## 4. Frontend Room Functional Descriptions
 
-### 4.1 Starting a New Run
+### 4.1 OperationsCenter.tsx (406 lines)
+Real-time monitoring dashboard. Connects to SSE stream. Displays health dimensions, event stream, alerts, provider status.
 
-1. User navigates to Command Center
-2. Clicks "New Run"
-3. Enters natural language specification
-4. System parses specification (SpecificationEngine)
-5. System creates run with initial state
-6. System begins pipeline execution
-7. User monitors progress in OperationsCenter
+### 4.2 ExplainabilityRoom.tsx (448 lines)
+Forensic reconstruction interface. 8 tabbed views for explanation types. Causal chain visualization. Evidence links.
 
-### 4.2 Monitoring a Run
+### 4.3 OperatorConsole.tsx (275 lines)
+Operator intervention controls. Active runs list. Intervention buttons with confirmation. Audit trail display.
 
-1. User navigates to OperationsCenter
-2. Views real-time health dashboard
-3. Watches live event stream via SSE
-4. Views trust score, drift status, cost
-5. Drills into specific run for details
-6. Views causal chain in ExplainabilityRoom
+### 4.4 MemoryOperations.tsx (247 lines)
+Memory lifecycle management. Entry list with state indicators. Aging controls. Archive/quarantine/restore actions.
 
-### 4.3 Intervening in a Run
+### 4.5 ModelOperationsCenter.tsx (251 lines)
+Multi-model routing operations. Capability cards. Sovereignty dashboard. Trust evolution charts.
 
-1. User navigates to OperatorConsole
-2. Views active runs with status
-3. Selects intervention type
-4. Provides reasoning
-5. Confirms intervention
-6. System executes and broadcasts result
-7. User verifies impact in OperationsCenter
+### 4.6 Dashboard.tsx (288 lines)
+Main dashboard. System health overview. Active runs. Quick actions.
 
-### 4.4 Explaining a Decision
+### 4.7 GovernanceGates.tsx (161 lines)
+Governance policy display. Gate status. Threshold configuration.
 
-1. User navigates to ExplainabilityRoom
-2. Selects explanation type
-3. Selects target (run, phase, decision)
-4. System retrieves evidence and builds causal chain
-5. User views causal chain with evidence links
-6. User views uncertainty disclosures
-7. User exports explanation if needed
+### 4.8 ReplayChamber.tsx (201 lines)
+Replay interface. Snapshot list. Integrity verification display.
 
-### 4.5 Managing Memory
+### 4.9 EvidenceCenter.tsx (107 lines)
+Evidence bundle explorer. Event list. Artifact browser.
 
-1. User navigates to MemoryOperations
-2. Views memory entries with lifecycle states
-3. Triggers aging process
-4. Archives old entries
-5. Quarantines suspicious entries
-6. Restores archived entries if needed
-7. Verifies evidence links are preserved
-
-### 4.6 Configuring Model Routing
-
-1. User navigates to ModelOperationsCenter
-2. Views active models with capabilities
-3. Configures sovereignty requirements
-4. Sets cost budgets
-5. Views routing decisions and reasoning
-6. Initiates arbitration for critical tasks
-7. Reviews arbitration results
+### 4.10 Tokenomics.tsx (293 lines)
+Cost tracking dashboard. Token usage charts. Agent attribution.
 
 ---
 
@@ -577,27 +455,25 @@ Explanation Request (type, target_id)
 ### 5.1 Run Data Flow
 
 ```
-Specification → SpecificationEngine → StructuredSpec
+Specification → RequirementNormalization + TestObligation
     ↓
-StructuredSpec → PlanningEngine → ExecutionPlan
+Planning → Architecture decisions (Artifact)
     ↓
-ExecutionPlan → CognitiveModelRouter → ModelSelection
+Implementation → Code generation (model-dependent)
     ↓
-ModelSelection → ModelProvider → RawOutput
+Verification → SemanticCoverageEngine → MutationTest → SemanticCoverageReport
     ↓
-RawOutput → ArbitrationEngine → ArbitratedOutput
+Governance → GovernanceEngine → Trust score
     ↓
-ArbitratedOutput → EvidenceCapture → EvidenceBundle
+Evidence → LogEvent + Artifact + EvidenceBundle
     ↓
-EvidenceBundle → IntegrityScoring → IntegrityScore
-    ↓
-IntegrityScore → ReleaseGate → ReleaseVerdict
+Release Gate → Release verdict
 ```
 
 ### 5.2 Event Data Flow
 
 ```
-Action → EventBus → { Database, SSE Stream, Internal Subscribers }
+Action → EventBus → { Database (LogEvent), SSE Stream, Internal Subscribers }
     ↓
 Database → AuditTrail (immutable, hash-chained)
 SSE Stream → Frontend (real-time updates)
@@ -613,16 +489,4 @@ GovernanceDecisions → ComplianceScore → TrustScoreUpdate
 OperatorFeedback → ManualAdjustment → TrustScoreUpdate
     ↓
 TrustScore → { ModelRouter, ArbitrationEngine, AutonomyManager }
-```
-
-### 5.4 Evidence Data Flow
-
-```
-All Actions → EventCapture → LogEvents
-    ↓
-PhaseCompletion → SnapshotCapture → Snapshots
-    ↓
-RunCompletion → EvidenceBundleCreation → EvidenceBundles
-    ↓
-EvidenceBundles → { ExplainabilityEngine, ReplayEngine, Audit }
 ```

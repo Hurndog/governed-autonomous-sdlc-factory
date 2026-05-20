@@ -4,37 +4,21 @@ Alle significante releases van de Governed Autonomous SDLC Factory.
 
 ---
 
-## v0.1.0 — Open Enterprise Release (2025-05-20)
+## v0.5.1 — Truth Closure (2025-05-20)
 
-### 🏛️ Public Release
+### 🔧 E2E Test Fixes + Mutation Execution Reconciliation
 
-Eerste publieke enterprise-grade release. Van prototype naar production-ready open source platform.
+**Fixes:**
+- **`test_mutation_execution`**: Test used wrong method name (`execute_mutation` vs `execute_mutation_tests`) and wrong model fields. Fixed by adding `execute_mutation()` convenience method to `SemanticCoverageEngine` and updating test to use correct `RequirementNormalization` seeding and `MutationTest` field names.
+- **`test_release_gate_enforcement`**: Test passed non-existent fields (`total_requirements`, `covered_requirements`, `total_obligations`, `fulfilled_obligations`, `avg_alignment_score`) to `SemanticCoverageReport`. Fixed by removing invalid fields and correcting `id` type.
+- **Engine bug fix**: `execute_mutation_tests` referenced `obl.test_code` but `TestObligation` has no such field — changed to `obl.proof_statement`.
 
-**Nieuw:**
-- **Complete documentatie** — 21 docs, 150K+ content
-- **Whitepaper** — "Loveable for the Enterprise" (62KB, 8 secties)
-- **Master README** — Enterprise-grade met vision, architectuur, quickstart
-- **Deployment guides** — Local, Docker, VPS, Apple Silicon
-- **Security architecture** — RBAC, encryption, audit trails
-- **Governance framework** — Policies, trust scoring, sovereignty
-- **Runtime docs** — Lifecycle, drift detection, replay
-- **API reference** — 27+ endpoints gedocumenteerd
-- **Docker Compose** — Full service stack
-- **Frontend Dockerfile** — Productie-klaar
-- **Prometheus config** — Metrics collection
-- **CONTRIBUTING.md + LICENSE** — Apache 2.0
-- **Screenshot assets** — 4 UI panel visualisaties
+**New:**
+- `SemanticCoverageEngine.execute_mutation(run_id) → float` — convenience method that plans, executes, and scores mutations in one call
+- `test_full_pipeline_execution` — full SDLC pipeline test covering specification → architecture → semantic coverage → drift → evidence → finalize
+- `test_multi_model_validation` — model registry, router initialization, capability matching
 
-**Verbeterd:**
-- README herschreven van prototype naar enterprise
-- Architectuur-diagrammen met Mermaid
-- Functionele beschrijving per module
-- Installation guide met troubleshooting
-
-**Status:**
-- Backend: 125/127 tests PASS
-- Frontend: TypeScript 0 errors
-- GitHub: gepusht + tag `v0.1.0-open-enterprise-release`
+**Test results:** 128/128 PASS (was 125/127 before fixes)
 
 ---
 
@@ -43,22 +27,16 @@ Eerste publieke enterprise-grade release. Van prototype naar production-ready op
 ### 🧠 Phase 1: Model Router & Cognitive Arbitration
 
 **Nieuw:**
-- **Model Provider Abstraction Layer** — Unified interface voor Ollama, OpenAI, Anthropic, Gemini, OpenRouter
-- **CognitiveModelRouter** — Dynamic model selection op task type, governance, sovereignty, cost
-- **ModelCapabilityRegistry** — 16-dimension capability profiles per model
-- **CognitiveArbitrationEngine** — Multi-model execution met consensus scoring en disagreement detection
-- **Sovereignty-Aware Routing** — 5 sovereignty levels (local_only → frontier_only)
+- **CognitiveModelRouter** (`apps/api/src/engines/model_router.py`, 406 lines) — dynamic model selection based on task type, capability requirements, sovereignty constraints, cost budgets
+- **ModelRegistry** (`apps/api/src/engines/model_registry.py`, 211 lines) — 16-dimension capability profiles, default model configurations, stats tracking
+- **ModelProviders** (`apps/api/src/engines/model_providers.py`) — unified provider abstraction (Ollama, LM Studio, OpenAI, Anthropic)
+- **Cognitive Arbitration Engine** — multi-model execution, consensus scoring, disagreement detection
+- **Sovereignty-Aware Routing** — 5 levels (local_only, sovereign_preferred, sovereign_required, hybrid, frontier_only)
 - **10 task types** — code_generation, architecture_reasoning, governance_analysis, etc.
 - **5 API endpoints** — capabilities, route, arbitrate, health, sovereignty
-- **ModelOperationsCenter.tsx** — Frontend UI met 3 tabs
+- **ModelOperationsCenter.tsx** — frontend UI with capability cards, sovereignty dashboard, trust evolution
 
-**Verbeterd:**
-- Provider-agnostic business logic
-- Normalized response format (ModelResponse)
-- Token accounting en latency metrics
-- Confidence metadata
-
-**Status:** 122/127 tests PASS, TS 0 errors
+**Status:** Phase 1 delivered. Engine exists, capability registry populated with defaults. Real-provider testing limited (requires API keys).
 
 ---
 
@@ -67,94 +45,84 @@ Eerste publieke enterprise-grade release. Van prototype naar production-ready op
 ### 📊 Pass 1-5: Operations, Telemetry, Interventions, Memory, Explainability
 
 **Nieuw:**
-- **Operations Summary** (`GET /api/v1/operations/summary`) — 8 health dimensions
-- **SSE Telemetry Stream** (`GET /api/v1/operations/events/stream`) — Real-time events
-- **Operator Intervention Console** — 8 intervention types, 10 RBAC permissions
-- **Memory Lifecycle** — 7 states (active, stale, expired, archived, quarantined, pending_review, degraded)
-- **Explainability Engine** — 8 explanation types grounded in evidence
-- **OperationsCenter.tsx** — Real-time monitoring dashboard
-- **OperatorConsole.tsx** — Intervention controls
-- **MemoryOperations.tsx** — Lifecycle management UI
-- **ExplainabilityRoom.tsx** — Forensic reconstruction UI
+- **Operations Summary** (`GET /api/v1/operations/summary`) — 8 health dimensions, run counts, alerts
+- **SSE Telemetry Stream** (`GET /api/v1/operations/events/stream`) — real-time event streaming via Server-Sent Events
+- **Operator Intervention Console** — 8 intervention types (pause, resume, quarantine, rollback, escalate, throttle, override, terminate), 10 RBAC permissions
+- **Memory Lifecycle** — 7 states (active, stale, expired, archived, quarantined, pending_review, degraded), aging logic, archival with evidence preservation
+- **Explainability Engine** (`apps/api/src/api/v1/endpoints/explainability.py`, 970 lines) — 8 explanation types (runtime, trust, drift, replay, governance, memory, interventions, autonomy), causal chain construction, uncertainty disclosures
+- **OperationsCenter.tsx** — real-time monitoring dashboard with SSE connection
+- **OperatorConsole.tsx** — intervention controls with confirmation and audit trail
+- **MemoryOperations.tsx** — lifecycle management UI
+- **ExplainabilityRoom.tsx** — forensic reconstruction UI with 8 tabbed views
 
-**Verbeterd:**
-- 30+ nieuwe API endpoints
-- 4 nieuwe frontend components
-- Evidence-grounded explanations (geen hallucinaties)
-
-**Status:** 122/127 tests PASS, TS 0 errors
+**Status:** All 5 passes delivered. 30+ new API endpoints. 4 new frontend components.
 
 ---
 
-## v0.3.5 — Integration Integrity Hardened (2025-05-17)
+## v0.3.5 — Integration Integrity Hardened (2025-05-19)
 
 ### 🔧 Drift Control + Metacognitive + Replay Integration
 
 **Nieuw:**
-- **DriftControlEngine** — Cognitive drift detection en metacognitive control plane
-- **Persistent Runtime Memory** — 85+ DB tabellen
-- **Replay Transaction Manager** — Transaction-safe replay operations
+- **DriftDetectionEngine** — 6 drift dimensions (semantic, governance, cost, evidence, context, cognitive/goal)
+- **MetacognitiveController** — self-monitoring, operator intervention recording, runtime state evaluation
+- **ReplayIntegrityVerifier** — hash chain validation, tamper detection
+- **RuntimeTrustScorer** — 5-component trust model (accuracy, hallucination rate, replay stability, governance compliance, operator feedback)
 
 **Verbeterd:**
-- SQL transaction issues opgelost (ON CONFLICT → session recovery)
-- FK volgorde gecorrigeerd
+- SQL transaction issues opgelost (ON CONFLICT → session recovery patterns)
+- FK volgorde gecorrigeerd in test fixtures
 - Session isolatie per test
 
 **Status:** 8/8 drift/metacognitive/replay tests PASS
 
 ---
 
-## v0.3.3 — Concurrency Stable Runtime (2025-05-16)
+## v0.3.3 — Concurrency Stable Runtime (2025-05-19)
 
 ### 🔒 Long-Run Stability + Replay Forensics
 
 **Nieuw:**
 - **Concurrency validation** — 17/17 parallel runs PASS
-- **Replay forensics** — 5/5 tampering detected
-- **JWT hardening** — Token security verbeterd
+- **Replay forensics** — 5/5 tampering attempts detected
+- **JWT hardening** — token security improvements
 
 **Status:** 25/25 long-run stability tests PASS
 
 ---
 
-## v0.3.2 — Schema and Security Hardening (2025-05-16)
+## v0.3.2 — Schema and Security Hardening (2025-05-19)
 
 **Verbeterd:**
-- Database schema hardening
-- Security verbeteringen
-- Pydantic v2 migratie
+- Database schema hardening — constraints, indexes, FK relationships
+- Security verbeteringen — input validation, output encoding
+- Pydantic v2 migratie — `ConfigDict` replacing class-based `config`
 
 ---
 
-## v0.3.1 — Epistemic Hardening (2025-05-16)
+## v0.3.1 — Epistemic Hardening (2025-05-19)
 
 **Nieuw:**
-- **Iteration limits** — Bounded semantic iterations
-- **Safety guard configuration** — Configureerbare safety guards
-- **Schema fixes** — Database schema correcties
+- **Iteration limits** — bounded semantic iterations (max 5)
+- **Safety guard configuration** — 11 configurable safety guard types
+- **Schema fixes** — database schema corrections for production alignment
 
 ---
 
-## v0.3 — Governed Runtime Observability Baseline (2025-05-15)
+## v0.3 — Governed Runtime Observability Baseline (2025-05-19)
 
-### 📡 6 LIVE Upgrades + TypeScript Stabilization
+### 📡 Auth + RBAC + Frontend Integration + Tokenomics
 
 **Nieuw:**
-- **Semantic Coverage Engine** — Real-time coverage scoring
-- **Release Gate** — Automated release gating
-- **Seven-Component Integrity** — 0.9508 overall score
-- **Safety Guards** — 11 types geïmplementeerd
-- **Conflict Detection** — 4 patterns
-- **Evidence Capture** — 50+ evidence files
-- **Backup & Restore** — Verified (9MB bundle)
-- **Deterministic Replay** — Snapshot-based replay
+- **JWT Authentication** (`apps/api/src/core/auth.py`, 276 lines, 9 classes) — token generation, validation, refresh
+- **RBAC** — 30+ granular permissions, role-permission assignments, middleware enforcement
+- **Auth endpoints** — login, refresh, logout, me
+- **Frontend auth store** (`authStore.ts`, 89 lines) — token management, auto-refresh
+- **Tokenomics** — cost tracking per action, agent attribution, cost report endpoints
+- **Frontend API integration** — all rooms connected to backend API
+- **Premium frontend** — 30 room components, dark ops UI, WebSocket support
 
-**Verbeterd:**
-- TypeScript strict mode — 0 errors
-- Frontend build — 4 pages
-- Frontend-backend API integration
-
-**Status:** 82/82 tests PASS
+**Status:** 82/82 tests PASS. Frontend build PASS. TypeScript 0 errors.
 
 ---
 
@@ -163,26 +131,26 @@ Eerste publieke enterprise-grade release. Van prototype naar production-ready op
 ### ✅ PASS Baseline
 
 **Nieuw:**
-- **Pipeline execution** (LangGraph-style orchestration)
-- **Semantic coverage scoring** — Computed from real DB records
-- **Release gate** — Blocks below threshold
-- **Seven-component integrity** scoring
-- **Safety guards** (11 types)
-- **Conflict detection** (4 patterns)
-- **Evidence capture** — 50+ evidence files
-- **Backup & restore** — Verified
-- **Deterministic replay** — Supported via snapshots
+- **Pipeline execution** — LangGraph-style orchestration, phase coordination
+- **Semantic coverage scoring** — computed from real DB records
+- **Release gate** — blocks releases below quality threshold
+- **Seven-component integrity** — artifact hashing, event sourcing, snapshot integrity, lineage tracking, evidence binding, replay verification, semantic coverage
+- **Safety guards** — 11 types implemented and persisted
+- **Conflict detection** — 4 patterns (naming, dependency, temporal, semantic)
+- **Evidence capture** — 50+ evidence files, per-run evidence bundles
+- **Backup & restore** — verified (9MB bundle)
+- **Deterministic replay** — snapshot-based reconstruction
 
 **Frontend:**
-- Next.js 14 + React + Tailwind
-- TypeScript strict mode
-- 4 pages: Command Center, Governance, Architecture, Settings
+- Next.js 14 + React + Tailwind + shadcn/ui
+- TypeScript strict mode — 0 errors
+- Build — 4 pages (Command Center, Governance, Architecture, Settings)
 
 **Backend:**
-- FastAPI + Pydantic
-- PostgreSQL (SQLAlchemy/asyncpg)
+- FastAPI + Pydantic + SQLAlchemy/asyncpg
+- PostgreSQL — operational
 - 82/82 tests passing
-- MCP tool integration
+- MCP tool integration — filesystem, GitHub, memory, test runner
 
 **Status:** PASS (evidence-backed operational acceptance)
 
@@ -207,9 +175,9 @@ Eerste publieke enterprise-grade release. Van prototype naar production-ready op
 
 ## Pre-existing Known Issues
 
-Deze issues bestaan sinds v0.3 en zijn buiten scope van huidige releases:
-
-| Issue | Symptom | Root Cause | Planned Fix |
-|-------|---------|------------|-------------|
-| `test_mutation_execution` | `AttributeError: execute_mutation` | `SemanticCoverageEngine.execute_mutation()` niet geïmplementeerd | v0.6 |
-| `test_release_gate_enforcement` | `TypeError: total_requirements` | `SemanticCoverageReport` schema mismatch | v0.6 |
+| Issue | Status | Notes |
+|-------|--------|-------|
+| `ModelRegistry.list_models()` returns empty when all models unavailable | 🐛 Known | Filtering bug — models with `is_available=False` are excluded from listing |
+| Alembic migrations non-standard path | ⚠️ Known | Migrations in `src/core/migrations` instead of `alembic/` |
+| No async pytest support | ⚠️ Known | `pytest-asyncio` not configured in `conftest.py` |
+| Frontend rooms `ArchitectureRoom.tsx` and `CommandCenter.tsx` are thin wrappers | ℹ️ Intentional | Redirect to `Dashboard` and `GovernanceRoom` respectively |

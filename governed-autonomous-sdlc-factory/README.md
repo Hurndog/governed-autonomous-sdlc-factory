@@ -12,78 +12,101 @@
 
 ---
 
-## Vision
-
-The AI industry has a governance problem.
-
-Current agentic systems optimize for capability demonstrations while treating governance, observability, and controllability as afterthoughts. The result: agents that cannot explain themselves, cannot be stopped, cannot be audited, and cannot be trusted.
-
-**The Governed Autonomous SDLC Factory is different.**
-
-This is not a chatbot. This is not a prompt chain. This is an **enterprise cognitive runtime** designed for environments where AI decisions have consequences.
-
-We believe that **governance is not a constraint on AI capability — it is a prerequisite for AI deployment in any environment where decisions have consequences.**
-
----
-
 ## What This Platform Is
 
-The Governed Autonomous SDLC Factory transforms natural language software specifications into complete, tested, documented, and deployed applications — with:
+The Governed Autonomous SDLC Factory is a **governed cognitive runtime** that executes software development lifecycle phases — from natural language specification through planning, implementation, verification, and release gating — with full observability, governance controls, evidence bundles, cost tracking, and multi-model cognitive arbitration.
 
-- 🔍 **Full observability** — Real-time telemetry via SSE streams
-- 🏛️ **Governance by default** — Every action is governed, every decision is auditable
-- 🧠 **Multi-model cognition** — Arbitrated decisions across multiple AI models
-- 🔒 **Sovereignty-aware routing** — Control over where cognition happens
-- 📜 **Immutable evidence** — Forensic reconstruction of any decision
-- 🛑 **Operator intervention** — Humans can intervene at any point
-- 🔄 **Deterministic replay** — Any run can be reconstructed and verified
-- 💰 **Cost governance** — Budget controls with hard limits and alerts
+This is not a chatbot. This is not a prompt chain. This is an **enterprise runtime** where every action is governed, every decision is auditable, and every run is replayable.
 
----
+### Validated Runtime State
 
-## Why Enterprise AI Needs Governance
-
-| Problem | Traditional Agents | This Platform |
-|---------|-------------------|---------------|
-| Explainability | ❌ Black box | ✅ Causal narratives from evidence |
-| Auditability | ❌ No audit trail | ✅ Immutable audit trail with hash chains |
-| Controllability | ❌ Run until done | ✅ 8 intervention types |
-| Sovereignty | ❌ Data leaves premises | ✅ Sovereignty-aware routing |
-| Trust | ❌ Faith-based | ✅ Computed trust scores |
-| Cost | ❌ Unbounded | ✅ Budget controls with limits |
-| Replay | ❌ Cannot reconstruct | ✅ Deterministic replay |
-| Disagreement | ❌ Suppressed | ✅ Surfaced and analyzed |
+| Dimension | Status | Evidence |
+|-----------|--------|----------|
+| Backend tests | ✅ 128/128 PASS | Full test suite including E2E pipeline |
+| Frontend build | ✅ PASS | TypeScript strict, 0 errors |
+| Pipeline execution | ✅ Validated | Full SDLC pipeline test passes |
+| Replay integrity | ✅ Operational | Hash-chained snapshots, tamper detection |
+| Drift detection | ✅ Operational | 6 drift dimensions, metacognitive control |
+| Trust scoring | ✅ Operational | RuntimeTrustScorer, 5-component model |
+| Explainability | ✅ Operational | 8 explanation types, evidence-grounded |
+| JWT + RBAC | ✅ Operational | 30+ permissions, 8 intervention types |
+| SSE telemetry | ✅ Operational | Real-time event streaming |
+| Memory lifecycle | ✅ Operational | 7 states, archival with evidence preservation |
+| Multi-model routing | ✅ Phase 1 | Capability registry, sovereignty routing |
+| Operator intervention | ✅ Operational | 8 intervention types, audit trail |
+| Mutation execution | ✅ Operational | Plan → execute → score pipeline |
+| Semantic coverage | ✅ Operational | 1229-line engine, 31 functions |
 
 ---
 
-## Core Features
+## Architecture Overview
 
-### 🧠 Multi-Model Cognitive Governance
-Dynamic model selection based on task type, governance requirements, sovereignty constraints, and cost budgets. Supports Ollama, OpenAI, Anthropic, Gemini, and OpenRouter.
+```
+┌─────────────────────────────────────────────────────────┐
+│  Frontend (Next.js 14 + TypeScript + Tailwind)          │
+│  30 Room Components • 10 UI Components • 10 Lib files   │
+│  SSE • WebSocket • Recharts • Zustand                   │
+└────────────────────────┬────────────────────────────────┘
+                         │ HTTP / SSE / WebSocket
+┌────────────────────────▼────────────────────────────────┐
+│  API Layer (FastAPI + Pydantic v2)                      │
+│  26 Endpoint Modules • Middleware • SSE Streams         │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Engine Layer (21 Engines)                              │
+│  SemanticCoverage • Governance • DriftDetection         │
+│  Replay • ModelRouter • TrustScorer • Metacognitive     │
+│  Explainability • Arbitration • InferenceTrace          │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Core Layer                                             │
+│  Auth (JWT+RBAC) • Config • Database • Event Bus        │
+│  Observability • Logging • Hashing • Safety Guards      │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  Infrastructure                                         │
+│  PostgreSQL (85+ tables) • Redis • Qdrant • Ollama      │
+└─────────────────────────────────────────────────────────┘
+```
 
-### ⚖️ Cognitive Arbitration Engine
-Execute tasks across multiple models, analyze disagreement, and produce governed decisions. Disagreement is surfaced, never suppressed.
+---
 
-### 🔍 Explainability Engine
-Causal narratives grounded in actual database records. Eight explanation types: runtime, trust, drift, replay, governance, memory, interventions, autonomy.
+## Runtime Layers
 
-### 🏛️ Governance Layer
-OPA Rego policies enforced at every layer. RBAC with 30+ granular permissions. Trust scores that affect autonomy levels.
+### Execution Layer
+- **Full Pipeline Orchestrator** (647 lines) — coordinates SDLC phases
+- **Semantic Coverage Engine** (1229 lines) — requirement normalization, test obligation, mutation testing
+- **Specification Engine** — natural language to structured specification
+- **Architecture Engine** — architectural reasoning and decision support
+- **Test Engine** — test execution and validation
 
-### 🔒 Sovereignty-Aware Routing
-Five sovereignty levels from `local_only` to `frontier_only`. Control over where data is processed and which models are used.
+### Governance Layer
+- **Governance Engine** — policy evaluation, trust scoring, release gating
+- **Drift Detection Engine** — 6 drift dimensions (semantic, governance, cost, evidence, context, cognitive)
+- **Metacognitive Controller** — self-monitoring, operator intervention recording
+- **Runtime Trust Scorer** — 5-component trust model (accuracy, hallucination, replay, governance, operator)
+- **Replay Integrity Verifier** — hash chain validation, tamper detection
 
-### 📜 Evidence & Replay
-Immutable evidence bundles with hash-chained integrity. Deterministic replay of any previous run with tamper detection.
+### Cognitive Layer
+- **Cognitive Model Router** (406 lines) — dynamic model selection, capability matching, sovereignty routing
+- **Model Registry** — 16-dimension capability profiles, default model configurations
+- **Cognitive Arbitration Engine** — multi-model execution, consensus scoring, disagreement analysis
+- **Inference Trace** — full trace of every model call
 
-### 🛑 Operator Intervention
-Eight intervention types: pause, resume, quarantine, rollback, escalate, throttle, override, terminate. All recorded in the audit trail.
+### Observability Layer
+- **Operations Endpoints** — health summary, event log, SSE telemetry stream
+- **Explainability Engine** (970 lines) — 8 explanation types, causal chain construction
+- **Memory Lifecycle Manager** (601 lines) — 7 lifecycle states, aging, archival, quarantine
+- **Operator Intervention Console** (569 lines) — 8 intervention types, RBAC-protected
 
-### 🧠 Memory Lifecycle
-Seven lifecycle states: active, stale, expired, archived, quarantined, pending_review, degraded. Archival preserves evidence links.
-
-### 📊 Real-Time Telemetry
-SSE streams for live event telemetry. Prometheus metrics. Structured logging with trace correlation.
+### Evidence Layer
+- **Evidence Capture** — every action produces immutable log events
+- **Hash Chain** — tamper-evident event linking
+- **Snapshot System** — deterministic run reconstruction
+- **Evidence Bundles** — per-run evidence packages
 
 ---
 
@@ -96,19 +119,36 @@ SSE streams for live event telemetry. Prometheus metrics. Structured logging wit
 | **[FUNCTIONAL.md](FUNCTIONAL.md)** | Functional descriptions + execution overviews |
 | **[TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md)** | Deep technical architecture |
 | **[RELEASES.md](RELEASES.md)** | Release notes per version |
-| **[Whitepaper](whitepaper/loveable-for-the-enterprise.md)** | 5000+ word technical whitepaper |
-| **[Architecture](docs/architecture/overview.md)** | Architecture diagrams (Mermaid) |
-| **[API Reference](docs/api/reference.md)** | Complete API endpoint reference |
-| **[Runtime](docs/runtime/index.md)** | Runtime lifecycle, trust, drift, replay |
-| **[Governance](docs/governance/index.md)** | Governance framework and policies |
-| **[Security](docs/security/architecture.md)** | Security architecture |
-| **[Deployment: Local](docs/deployment/local.md)** | Local installation guide |
-| **[Deployment: Docker](docs/deployment/docker.md)** | Docker deployment guide |
-| **[Deployment: VPS](docs/deployment/vps.md)** | VPS deployment guide |
-| **[Deployment: Apple Silicon](docs/deployment/apple-silicon.md)** | Apple Silicon optimized setup |
-| **[Examples](examples/README.md)** | Runnable example workflows |
-| **[Contributing](CONTRIBUTING.md)** | Contribution guidelines |
-| **[License](LICENSE)** | Apache 2.0 |
+| **[CURRENT-TRUTH-MATRIX.md](CURRENT-TRUTH-MATRIX.md)** | Canonical runtime truth reference |
+| **[Whitepaper](whitepaper/loveable-for-the-enterprise.md)** | Technical whitepaper |
+
+### Architecture & Design
+| Document | Description |
+|----------|-------------|
+| [Architecture Overview](docs/architecture/overview.md) | System architecture with Mermaid diagrams |
+| [Current Runtime Baseline](docs/architecture/current-runtime-baseline.md) | Runtime baseline assessment |
+| [Security Access Control](docs/architecture/security-access-control-phase-1.md) | Security architecture |
+| [Cognitive Cortex Philosophy](docs/cognitive-cortex-philosophy.md) | Design philosophy |
+| [Deterministic Replay Spec](docs/deterministic-replay-spec.md) | Replay system specification |
+| [Execution Integrity](docs/execution-integrity-architecture.md) | Integrity architecture |
+| [Observability Substrate](docs/observability-substrate-spec.md) | Observability design |
+
+### Operations & Governance
+| Document | Description |
+|----------|-------------|
+| [API Reference](docs/api/reference.md) | Complete API endpoint reference |
+| [Runtime](docs/runtime/index.md) | Runtime lifecycle, trust, drift, replay |
+| [Governance](docs/governance/index.md) | Governance framework and policies |
+| [Security](docs/security/architecture.md) | Security architecture |
+| [Operations](docs/operations/) | Operations documentation |
+
+### Deployment
+| Document | Description |
+|----------|-------------|
+| [Local Deployment](docs/deployment/local.md) | Local installation guide |
+| [Docker Deployment](docs/deployment/docker.md) | Docker deployment guide |
+| [VPS Deployment](docs/deployment/vps.md) | VPS deployment guide |
+| [Apple Silicon](docs/deployment/apple-silicon.md) | Apple Silicon optimized setup |
 
 ---
 
@@ -130,7 +170,7 @@ cd governed-autonomous-sdlc-factory
 
 # 2. Configure
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your settings (DATABASE_URL, REDIS_URL, API_SECRET required)
 
 # 3. Backend
 python -m venv venv && source venv/bin/activate
@@ -166,55 +206,6 @@ open http://localhost:3000
 
 ---
 
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Frontend (Next.js 14 + TypeScript + Tailwind)          │
-│  35+ Room Components • SSE • WebSocket • Recharts       │
-└────────────────────────┬────────────────────────────────┘
-                         │ HTTP / SSE / WebSocket
-┌────────────────────────▼────────────────────────────────┐
-│  API Layer (FastAPI + Pydantic v2)                      │
-│  27+ Endpoint Modules • Middleware • SSE Streams        │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Engine Layer (17+ Specialized Engines)                 │
-│  Model Router • Arbitration • Governance • Replay       │
-│  Drift Control • Semantic Coverage • Evidence           │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│  Infrastructure                                         │
-│  PostgreSQL • Redis • Qdrant • Ollama • Prometheus      │
-└─────────────────────────────────────────────────────────┘
-```
-
-See [TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md) for detailed architecture.
-
----
-
-## Supported Providers
-
-### Local
-
-| Provider | Models | Sovereignty |
-|----------|--------|-------------|
-| Ollama | phi3, qwen2.5-coder, llama3.1, deepseek-r1 | ✅ Local |
-| llama.cpp | Any GGUF model | ✅ Local |
-
-### Remote
-
-| Provider | Models | Sovereignty |
-|----------|--------|-------------|
-| OpenAI | GPT-4o, GPT-4o-mini, o1 | ☁️ Frontier |
-| Anthropic | Claude 3.5 Sonnet, Claude 3 Opus | ☁️ Frontier |
-| Google | Gemini 1.5 Pro, Gemini 1.5 Flash | ☁️ Frontier |
-| OpenRouter | 100+ models | ☁️ Frontier |
-
----
-
 ## Key URLs
 
 | Service | URL |
@@ -228,86 +219,66 @@ See [TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md) for detailed architec
 
 ---
 
-## API Overview
-
-### Authentication
-- `POST /api/v1/auth/login` — Login
-- `POST /api/v1/auth/refresh` — Refresh token
-
-### Projects & Runs
-- `GET /api/v1/projects` — List projects
-- `POST /api/v1/runs` — Start run
-- `GET /api/v1/runs/{id}` — Get run details
-
-### Operations
-- `GET /api/v1/operations/summary` — System health
-- `GET /api/v1/operations/events` — Event log
-- `GET /api/v1/operations/events/stream` — SSE telemetry
-
-### Explainability
-- `GET /api/v1/explain/runtime/{id}` — Runtime explanation
-- `GET /api/v1/explain/trust/{id}` — Trust explanation
-- `GET /api/v1/explain/drift/{id}` — Drift explanation
-
-### Model Router
-- `GET /api/v1/model-router/capabilities` — Model capabilities
-- `POST /api/v1/model-router/route` — Get routing decision
-- `POST /api/v1/model-router/arbitrate` — Run arbitration
-
-### Interventions
-- `POST /api/v1/interventions/pause` — Pause
-- `POST /api/v1/interventions/resume` — Resume
-- `POST /api/v1/interventions/quarantine` — Quarantine
-- `POST /api/v1/interventions/rollback` — Rollback
-
-See [API Reference](docs/api/reference.md) for complete documentation.
-
----
-
 ## Release History
 
 | Version | Date | Description |
 |---------|------|-------------|
-| [v0.1.0](RELEASES.md#v010--open-enterprise-release-2025-05-20) | 2025-05-20 | Open Enterprise Release — complete docs, deployment, whitepaper |
-| [v0.5](RELEASES.md#v05--multi-model-cognitive-governance-2025-05-19) | 2025-05-19 | Multi-Model Cognitive Governance — router, arbitration, sovereignty |
-| [v0.4](RELEASES.md#v04--enterprise-cognitive-operations-2025-05-19) | 2025-05-19 | Enterprise Cognitive Operations — monitoring, interventions, explainability |
-| [v0.3.5](RELEASES.md#v035--integration-integrity-hardened-2025-05-17) | 2025-05-17 | Integration Integrity Hardened — drift control, metacognitive |
-| [v0.3.3](RELEASES.md#v033--concurrency-stable-runtime-2025-05-16) | 2025-05-16 | Concurrency Stable — 25/25 stability, 5/5 tamper detection |
-| [v0.3](RELEASES.md#v03--governed-runtime-observability-baseline-2025-05-15) | 2025-05-15 | Observability Baseline — 6 LIVE upgrades |
-| [v0.2.0](RELEASES.md#v020--evidence-backed-runtime-2025-05-14) | 2025-05-14 | Evidence-Backed Runtime — PASS baseline |
-| [v0.1.0](RELEASES.md#v010--golden-integrity-runtime-2025-05-14) | 2025-05-14 | Golden Integrity Runtime — initial baseline |
+| [v0.5.1](RELEASES.md#v051) | 2025-05-20 | Truth Closure — E2E fixes, mutation execution, 128/128 tests |
+| [v0.5](RELEASES.md#v05) | 2025-05-19 | Multi-Model Cognitive Governance — router, arbitration, sovereignty |
+| [v0.4](RELEASES.md#v04) | 2025-05-19 | Enterprise Cognitive Operations — monitoring, interventions, explainability |
+| [v0.3.5](RELEASES.md#v035) | 2025-05-19 | Integration Integrity — drift control, metacognitive, replay |
+| [v0.3.3](RELEASES.md#v033) | 2025-05-19 | Concurrency Stable — 25/25 stability, 5/5 tamper detection |
+| [v0.3](RELEASES.md#v03) | 2025-05-19 | Observability Baseline — auth, RBAC, semantic coverage |
+| [v0.2.0](RELEASES.md#v020) | 2025-05-14 | Evidence-Backed Runtime — pipeline, integrity, evidence |
+| [v0.1.0](RELEASES.md#v010) | 2025-05-14 | Golden Integrity Runtime — initial baseline |
 
 See [RELEASES.md](RELEASES.md) for detailed release notes.
 
 ---
 
-## Roadmap
+## Operational Reality
 
-### v0.6 — Semantic Execution Memory
-- Semantic execution patterns (not just facts)
-- Learning from past runs
-- Improved routing based on historical performance
+### What Is Production-Ready
+- Backend runtime with 128/128 passing tests
+- Frontend with 30 room components, TypeScript strict
+- JWT authentication and RBAC authorization
+- SSE telemetry streaming
+- Evidence capture with hash chains
+- Deterministic replay with tamper detection
+- Drift detection across 6 dimensions
+- Trust scoring with 5-component model
+- Mutation testing (plan → execute → score)
+- Operator intervention framework
+- Memory lifecycle management
+- Multi-model routing with capability registry
 
-### v0.7 — Ontology-Constrained Execution
-- Formal domain models
-- Constrained valid operations
-- Ontology-aware governance
+### What Is NOT Production-Ready
+- **No CI/CD pipeline** — no `.github/workflows/`
+- **No automated backups** — manual backup scripts only
+- **No TLS/SSL configuration** — must be added via reverse proxy
+- **No rate limiting** — API is unprotected against abuse
+- **No security headers** — no HSTS, CSP, or X-Frame-Options
+- **No container health checks** — Docker Compose has no health checks
+- **No log rotation** — logs grow unbounded
+- **No database connection pooling** — default SQLAlchemy pool only
+- **No production deployment validation** — not tested at enterprise scale
+- **No HA/failover** — single-instance deployment only
+- **No enterprise-scale load testing** — validated for development workloads only
 
-### v0.8 — Trust Decay Scoring
-- Natural trust decay over time
-- Reinforcement through success
-- Prevention of stale trust
+### What Is Experimental
+- **Multi-model arbitration** — engine exists but limited real-provider testing
+- **Sovereignty routing** — 5 levels defined, edge cases untested
+- **Semantic coverage scoring** — deterministic scoring, not LLM-based
+- **Mutation execution** — works for Python test code, limited language support
+- **Explainability narratives** — template-based, not LLM-generated
+- **Drift detection** — rule-based thresholds, not adaptive
 
-### v0.9 — Deception Detection
-- Detect technically correct but misleading outputs
-- Identify governance avoidance patterns
-- Surface hidden biases
-
-### v1.0 — Constitutional Governance
-- Immutable constitutional principles
-- Unoverrideable boundaries
-- External audit support
-- Evidence signing
+### Known Limitations
+- Frontend rooms `ArchitectureRoom.tsx` (8 lines) and `CommandCenter.tsx` (9 lines) are thin wrappers/redirects
+- `ModelRegistry.list_models()` returns empty when all models have `is_available=False` — filtering bug
+- Alembic migrations use non-standard path (`src/core/migrations` not `alembic/`)
+- No async test support in pytest (missing `pytest-asyncio` marker config)
+- Ollama provider requires local Ollama instance; remote providers require API keys
 
 ---
 
@@ -315,23 +286,26 @@ See [RELEASES.md](RELEASES.md) for detailed release notes.
 
 This platform is designed for **governed autonomous operation within trusted environments**. It is not designed for direct exposure to untrusted users without additional security layers (WAF, API gateway, etc.).
 
-**Always:**
-- Deploy behind a reverse proxy with SSL termination
-- Use strong JWT secrets (256-bit minimum)
-- Rotate API keys regularly
-- Review audit logs weekly
-- Keep dependencies updated
+**Required for production:**
+- Reverse proxy with SSL termination (nginx, traefik)
+- Strong JWT secrets (256-bit minimum, rotated regularly)
+- API key rotation policy
+- Rate limiting middleware
+- Security headers (HSTS, CSP, X-Frame-Options)
+- Database encryption at rest
+- Log rotation and monitoring
+- Regular dependency updates (`pip audit`, `npm audit`)
 
 ---
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests: `pytest tests/ -v`
+4. Run tests: `cd apps/api && python -m pytest tests/ -v`
 5. Run type check: `cd apps/web && npm run typecheck`
 6. Submit a pull request
 
@@ -340,20 +314,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## License
 
 Apache 2.0 — See [LICENSE](LICENSE) for details.
-
----
-
-## Acknowledgments
-
-Built with:
-- [FastAPI](https://fastapi.tiangolo.com) — Web framework
-- [Next.js](https://nextjs.org) — React framework
-- [PostgreSQL](https://postgresql.org) — Database
-- [Redis](https://redis.io) — Cache and queue
-- [Qdrant](https://qdrant.tech) — Vector memory
-- [Ollama](https://ollama.ai) — Local model serving
-- [OpenTelemetry](https://opentelemetry.io) — Observability
-- [OPA](https://openpolicyagent.org) — Policy engine
 
 ---
 

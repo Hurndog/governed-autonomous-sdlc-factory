@@ -1,20 +1,23 @@
 # Technical Architecture
 
-## Table of Contents
-
-1. [System Overview](#1-system-overview)
-2. [Backend Architecture](#2-backend-architecture)
-3. [Frontend Architecture](#3-frontend-architecture)
-4. [Database Architecture](#4-database-architecture)
-5. [Event System](#5-event-system)
-6. [Security Architecture](#6-security-architecture)
-7. [Model Provider Architecture](#7-model-provider-architecture)
-8. [Deployment Architecture](#8-deployment-architecture)
-9. [Performance Characteristics](#9-performance-characteristics)
+**Last updated:** 2025-05-20
+**Validated against:** 128/128 backend tests PASS, full pipeline execution, TypeScript 0 errors
 
 ---
 
 ## 1. System Overview
+
+### Validated Runtime State
+
+| Component | Count | Status |
+|-----------|-------|--------|
+| Backend engines | 21 files | All operational |
+| API endpoints | 26 modules | All operational |
+| Frontend rooms | 30 components | 28 substantive, 2 thin wrappers |
+| Frontend UI components | 10 | All operational |
+| Database tables | 85+ | All created via SQLAlchemy models |
+| Test files | 14 | 128/128 PASS |
+| Evidence files | 112+ | Runtime-generated |
 
 ### Technology Stack
 
@@ -24,7 +27,7 @@
 | Backend | Pydantic | 2.9 | Data validation |
 | Backend | SQLAlchemy | 2.0.35 | ORM (async) |
 | Backend | asyncpg | 0.29 | PostgreSQL driver |
-| Backend | Alembic | 1.13 | Migrations |
+| Backend | Alembic | 1.13 | Migrations (non-standard path: `src/core/migrations`) |
 | Backend | structlog | 24.4 | Structured logging |
 | Backend | OpenTelemetry | 1.27 | Observability |
 | Backend | httpx | 0.27 | HTTP client |
@@ -41,46 +44,6 @@
 | Metrics | Prometheus | Latest | Metrics |
 | Dashboards | Grafana | Latest | Visualization |
 | Local LLM | Ollama | Latest | Model serving |
-| Container | Docker | 24+ | Containerization |
-| Orchestration | Docker Compose | 2.x | Multi-container |
-
-### System Boundaries
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        EXTERNAL SYSTEMS                          │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │
-│  │ OpenAI   │ │ Anthropic│ │ Gemini   │ │ OpenRouter       │  │
-│  │ API      │ │ API      │ │ API      │ │ API              │  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────────────┘  │
-└───────┼────────────┼────────────┼──────────────┼────────────────┘
-        │            │            │              │
-┌───────▼────────────▼────────────▼──────────────▼────────────────┐
-│                     API GATEWAY (FastAPI)                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Middleware: Auth → Trace → Audit → CORS                 │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Endpoints: 27+ modules                                  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Services: Orchestration, Runs, Projects                 │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Engines: 17+ specialized engines                        │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Core: Auth, Config, DB, Events, Observability           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-        │            │            │              │
-┌───────▼────────────▼────────────▼──────────────▼────────────────┐
-│                      DATA LAYER                                   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
-│  │ PostgreSQL│ │ Redis    │ │ Qdrant   │ │ Ollama           │   │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -88,31 +51,30 @@
 
 ### Layered Architecture
 
-The backend follows a strict layered architecture with dependency injection:
-
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  API Layer (apps/api/src/api/v1/endpoints/)              │
-│  - 27+ endpoint modules                                  │
+│  - 26 endpoint modules                                   │
 │  - Request validation (Pydantic)                         │
 │  - Response serialization                                │
 │  - Permission declarations                               │
-│  Dependencies: Services, Core                            │
 ├─────────────────────────────────────────────────────────┤
 │  Service Layer (apps/api/src/services/)                   │
-│  - FullPipelineOrchestrator                              │
+│  - FullPipelineOrchestrator (647 lines)                  │
 │  - RunOrchestrator                                       │
 │  - RunService, PhaseService, ProjectService              │
 │  - ArtifactStore                                         │
-│  Dependencies: Engines, Core                             │
 ├─────────────────────────────────────────────────────────┤
 │  Engine Layer (apps/api/src/engines/)                     │
-│  - CognitiveModelRouter                                  │
-│  - CognitiveArbitrationEngine                            │
-│  - DriftControlEngine                                    │
-│  - GovernanceEngine                                      │
-│  - ReplayEngine                                          │
-│  - SemanticCoverageEngine                                │
+│  - SemanticCoverageEngine (1229 lines, 31 functions)     │
+│  - DriftDetectionEngine (6 drift dimensions)             │
+│  - ReplayIntegrityVerifier (hash chain)                  │
+│  - MetacognitiveController (self-monitoring)             │
+│  - RuntimeTrustScorer (5-component model)                │
+│  - CognitiveModelRouter (406 lines)                      │
+│  - ModelRegistry (211 lines)                             │
+│  - GovernanceEngine (251 lines)                          │
+│  - ReplayEngine (452 lines)                              │
 │  - SpecificationEngine                                   │
 │  - ArchitectureEngine                                    │
 │  - InferenceTrace                                        │
@@ -123,15 +85,13 @@ The backend follows a strict layered architecture with dependency injection:
 │  - ReplayTransactionManager                              │
 │  - IntegrityRuntimeSync                                  │
 │  - ReplayRuntimeSync                                     │
-│  - ModelRegistry                                         │
-│  - OllamaProvider                                        │
-│  - ModelProviders (unified)                              │
+│  - ModelProviders (unified abstraction)                  │
+│  - OllamaProvider (106 lines)                            │
 │  - CognitiveGovernance                                   │
 │  - TestEngine                                            │
-│  Dependencies: Core                                      │
 ├─────────────────────────────────────────────────────────┤
 │  Core Layer (apps/api/src/core/)                          │
-│  - auth.py (JWT + RBAC)                                  │
+│  - auth.py (JWT + RBAC, 276 lines, 9 classes)            │
 │  - config.py (Pydantic Settings)                         │
 │  - database.py (SQLAlchemy async engine)                 │
 │  - event_bus.py (internal pub/sub)                       │
@@ -145,50 +105,20 @@ The backend follows a strict layered architecture with dependency injection:
 │  - hash_propagation.py (artifact hashing)                │
 │  - startup_diagnostics.py (health checks)                │
 │  - models.py (SQLAlchemy ORM models)                     │
-│  - models_semantic_coverage.py                           │
-│  Dependencies: None (foundation layer)                   │
+│  - models_semantic_coverage.py (22 model classes)        │
 ├─────────────────────────────────────────────────────────┤
 │  Schema Layer (apps/api/src/schemas/)                     │
 │  - Pydantic v2 schemas for all API I/O                   │
-│  - Input validation                                      │
-│  - Output serialization                                  │
-│  - Common types (pagination, responses)                  │
 ├─────────────────────────────────────────────────────────┤
 │  WebSocket Layer (apps/api/src/websocket/)                │
 │  - run_events.py (WebSocket event broadcasting)          │
-│  Dependencies: Core                                      │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### Middleware Stack
 
-Request processing order:
-
 ```
-Request
-  │
-  ▼
-┌─────────────────────┐
-│  CORS Middleware     │  ← Handle cross-origin requests
-└──────────┬──────────┘
-           ▼
-┌─────────────────────┐
-│  Trace Middleware    │  ← Assign trace_id, measure latency
-└──────────┬──────────┘
-           ▼
-┌─────────────────────┐
-│  Audit Middleware    │  ← Log request/response for audit
-└──────────┬──────────┘
-           ▼
-┌─────────────────────┐
-│  Auth Middleware     │  ← Verify JWT, extract user
-└──────────┬──────────┘
-           ▼
-┌─────────────────────┐
-│  Endpoint Handler    │  ← Business logic
-└──────────┬──────────┘
-           ▼
-        Response
+Request → CORS → Trace → Audit → Auth → Endpoint → Response
 ```
 
 ### Engine Communication Pattern
@@ -205,12 +135,6 @@ Engine A ──publish──▶ Event Bus ──subscribe──▶ Engine B
                     SSE Stream (notify frontend)
 ```
 
-This ensures:
-- **Loose coupling**: Engines don't know about each other
-- **Testability**: Each engine can be tested in isolation
-- **Observability**: All inter-engine communication is visible
-- **Replayability**: Events can be replayed to reconstruct state
-
 ---
 
 ## 3. Frontend Architecture
@@ -220,161 +144,70 @@ This ensures:
 ```
 src/app/                          ← Next.js App Router
 ├── layout.tsx                    ← Root layout (auth, theme)
-├── page.tsx                      ← Home page (redirect to dashboard)
+├── page.tsx                      ← Home page
 ├── login/page.tsx                ← Login page
 └── globals.css                   ← Global styles
 
-src/lib/                          ← Client libraries
-├── api.ts                        ← REST API client
+src/lib/                          ← Client libraries (10 files)
+├── api.ts (827 lines)            ← REST API client
 ├── useApiData.ts                 ← Data fetching hook
 ├── useWebSocket.ts               ← WebSocket hook
-├── authStore.ts                  ← Auth state (Zustand)
+├── authStore.ts (89 lines)       ← Auth state (Zustand)
 ├── store.ts                      ← Global state (Zustand)
 ├── data-source.ts                ← Data source management
 ├── theme.ts                      ← Theme configuration
 ├── utils.ts                      ← Utility functions
-├── types.ts                      ← TypeScript types
+├── types.ts (438 lines)          ← TypeScript types
 └── mock-data.ts                  ← Demo data
 
 src/components/
 ├── AuthGuard.tsx                 ← Auth protection wrapper
-├── ui/                           ← Shared UI components
-│   ├── Badge.tsx
-│   ├── Card.tsx
-│   ├── DataSourceBadge.tsx
-│   ├── GaugeChart.tsx
-│   ├── MetricCard.tsx
-│   ├── ProgressBar.tsx
-│   ├── SectionHeader.tsx
-│   ├── Sidebar.tsx
-│   ├── StatusChip.tsx
-│   └── TopBar.tsx
-└── rooms/                        ← Feature rooms (35+)
-    ├── CommandCenter.tsx
-    ├── OperationsCenter.tsx
-    ├── ExplainabilityRoom.tsx
-    ├── ModelOperationsCenter.tsx
-    ├── OperatorConsole.tsx
-    ├── MemoryOperations.tsx
-    ├── GovernanceGates.tsx
-    ├── ReplayChamber.tsx
-    ├── EvidenceCenter.tsx
-    ├── ArchitectureRoom.tsx
-    ├── SemanticCoverage.tsx
-    ├── TraceabilityRoom.tsx
-    ├── IntegrityRoom.tsx
-    ├── LogsDiagnostics.tsx
-    ├── ArtifactExplorer.tsx
-    ├── RunControlRoom.tsx
-    ├── AgentCommandCenter.tsx
-    ├── ExecutiveCockpit.tsx
-    ├── ProcessTimeline.tsx
-    ├── BuildMap.tsx
-    ├── BacklogChecklist.tsx
-    ├── UserManagement.tsx
-    ├── SettingsProviders.tsx
-    ├── Tokenomics.tsx
-    ├── SpecRoom.tsx
-    ├── RunReplay.tsx
-    ├── SDLCNavigator.tsx
-    ├── ArchitectureIntelligence.tsx
-    └── Dashboard.tsx
+├── ui/ (10 components)           ← Shared UI components
+│   ├── Badge.tsx, Card.tsx, DataSourceBadge.tsx
+│   ├── GaugeChart.tsx, MetricCard.tsx, ProgressBar.tsx
+│   ├── SectionHeader.tsx, Sidebar.tsx, StatusChip.tsx, TopBar.tsx
+└── rooms/ (30 components)        ← Feature rooms
+    ├── OperationsCenter.tsx (406 lines) ← SSE telemetry dashboard
+    ├── ExplainabilityRoom.tsx (448 lines) ← Forensic reconstruction
+    ├── OperatorConsole.tsx (275 lines) ← Intervention controls
+    ├── MemoryOperations.tsx (247 lines) ← Lifecycle management
+    ├── ModelOperationsCenter.tsx (251 lines) ← Multi-model routing
+    ├── Dashboard.tsx (288 lines) ← Main dashboard
+    ├── GovernanceGates.tsx (161 lines) ← Policy display
+    ├── ReplayChamber.tsx (201 lines) ← Replay interface
+    ├── EvidenceCenter.tsx (107 lines) ← Evidence explorer
+    ├── Tokenomics.tsx (293 lines) ← Cost tracking
+    ├── SDLCNavigator.tsx (359 lines) ← Phase navigation
+    ├── BuildMap.tsx (448 lines) ← Build pipeline visualization
+    ├── ProcessTimeline.tsx (306 lines) ← Visual timeline
+    ├── SemanticCoverage.tsx (244 lines) ← Coverage analysis
+    ├── TraceabilityRoom.tsx (144 lines) ← Lineage tracking
+    ├── IntegrityRoom.tsx (137 lines) ← Integrity scoring
+    ├── LogsDiagnostics.tsx (112 lines) ← Log exploration
+    ├── ArtifactExplorer.tsx (180 lines) ← Artifact browser
+    ├── RunControlRoom.tsx (173 lines) ← Run management
+    ├── RunReplay.tsx (164 lines) ← Interactive replay
+    ├── SpecRoom.tsx (160 lines) ← Specification management
+    ├── SettingsProviders.tsx (156 lines) ← Provider config
+    ├── UserManagement.tsx (299 lines) ← User admin
+    ├── BacklogChecklist.tsx (247 lines) ← Task backlog
+    ├── ExecutiveCockpit.tsx (288 lines) ← Executive dashboard
+    ├── AgentCommandCenter.tsx (283 lines) ← Agent management
+    ├── ArchitectureIntelligence.tsx (89 lines) ← AI architecture
+    ├── GovernanceRoom.tsx (247 lines) ← Governance overview
+    ├── CommandCenter.tsx (9 lines) ← Redirect to Dashboard
+    └── ArchitectureRoom.tsx (8 lines) ← Redirect to GovernanceRoom
 ```
 
 ### State Management
 
-The frontend uses Zustand for state management with the following stores:
-
-```typescript
-// Auth Store
-interface AuthStore {
-  user: User | null;
-  token: string | null;
-  refreshToken: string | null;
-  login: (credentials: Credentials) => Promise<void>;
-  logout: () => void;
-  refresh: () => Promise<void>;
-}
-
-// Data Store
-interface DataStore {
-  runs: Run[];
-  projects: Project[];
-  workspaces: Workspace[];
-  activeRun: Run | null;
-  setActiveRun: (run: Run) => void;
-  refreshRuns: () => Promise<void>;
-}
-
-// Connection Store
-interface ConnectionStore {
-  sseConnected: boolean;
-  wsConnected: boolean;
-  lastEvent: Event | null;
-  connectSSE: () => void;
-  disconnectSSE: () => void;
-}
-```
+- **Auth Store** (`authStore.ts`) — JWT token management, auto-refresh
+- **Data Store** (`store.ts`) — Runs, projects, workspaces via Zustand
+- **Connection Store** — SSE connection state, WebSocket state
 
 ### SSE Integration
 
-The frontend connects to the SSE telemetry stream for real-time updates:
-
-```typescript
-// SSE connection management
-const connectSSE = () => {
-  const eventSource = new EventSource(
-    `${API_URL}/api/v1/operations/events/stream`,
-    { withCredentials: true }
-  );
-
-  eventSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    // Update stores based on event type
-    handleEvent(data);
-  };
-
-  eventSource.onerror = () => {
-    // Auto-reconnect with exponential backoff
-    setTimeout(connectSSE, Math.min(retryDelay * 2, 30000));
-  };
-};
-```
-
-### API Client
-
-The API client handles all backend communication:
-
-```typescript
-class ApiClient {
-  private baseUrl: string;
-  private token: string | null;
-
-  async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-        ...options?.headers,
-      },
-    });
-
-    if (!response.ok) {
-      throw new ApiError(response.status, await response.json());
-    }
-
-    return response.json();
-  }
-
-  // Typed endpoints
-  getRuns(): Promise<Run[]> { ... }
-  startRun(spec: Specification): Promise<Run> { ... }
-  pauseRun(runId: string): Promise<void> { ... }
-  getExplanation(type: string, targetId: string): Promise<Explanation> { ... }
-  // ... 27+ endpoint modules
-}
-```
+The frontend connects to `GET /api/v1/operations/events/stream` for real-time updates. Auto-reconnect with exponential backoff.
 
 ---
 
@@ -382,51 +215,18 @@ class ApiClient {
 
 ### Schema Organization
 
-The database uses PostgreSQL with 85+ tables organized into domains:
+85+ tables in PostgreSQL:
 
-#### Core Domain
-- `workspaces` — Top-level organization units
-- `projects` — Projects within workspaces
-- `users` — User accounts
-- `roles` — RBAC roles
-- `permissions` — Granular permissions
-- `user_roles` — User-role assignments
-- `role_permissions` — Role-permission assignments
-
-#### Run Domain
-- `runs` — Pipeline execution runs
-- `phases` — Phase executions within runs
-- `tasks` — Individual tasks within phases
-- `agents` — Agent configurations
-- `artifacts` — Generated artifacts with SHA-256 hashes
-
-#### Evidence Domain
-- `evidence_bundles` — Immutable evidence collections
-- `log_events` — Immutable event log with hash chain
-- `snapshots` — Run state snapshots
-- `hash_chains` — Hash chain verification data
-
-#### Governance Domain
-- `governance_policies` — OPA Rego policy definitions
-- `trust_scores` — Trust score history
-- `operator_interventions` — Intervention records
-- `audit_trails` — Audit trail entries
-
-#### Memory Domain
-- `memory_versions` — Memory entry versions
-- `memory_lifecycle` — Lifecycle state tracking
-- `memory_quarantine` — Quarantined memory entries
-
-#### Model Domain
-- `model_capabilities` — Model capability profiles
-- `routing_decisions` — Routing decision log
-- `arbitration_results` — Arbitration result log
-- `provider_health` — Provider health status
-
-#### Economic Domain
-- `cost_records` — Cost tracking per action
-- `token_usage` — Token usage per model call
-- `budget_alerts` — Budget threshold alerts
+| Domain | Tables |
+|--------|--------|
+| Core | workspaces, projects, users, roles, permissions, user_roles, role_permissions |
+| Run | runs, phases, tasks, agents, artifacts |
+| Evidence | evidence_bundles, log_events, snapshots, hash_chains |
+| Governance | governance_policies, trust_scores, operator_interventions, audit_trails |
+| Memory | memory_versions, memory_lifecycle, memory_quarantine |
+| Model | model_capabilities, routing_decisions, arbitration_results, provider_health |
+| Economic | cost_records, token_usage, budget_alerts |
+| Semantic | requirement_normalizations, acceptance_criteria_contracts, test_obligations, semantic_alignment_evaluations, verifier_critiques, mutation_tests, negative_test_requirements, runtime_evidence_bindings, semantic_coverage_reports, semantic_coverage_waivers |
 
 ### Key Relationships
 
@@ -443,140 +243,73 @@ workspaces (1) ─── (N) projects (1) ─── (N) runs (1) ─── (N) p
                                               └── (N) routing_decisions
 ```
 
-### Indexing Strategy
-
-Critical indexes for performance:
-
-```sql
--- Run queries
-CREATE INDEX idx_runs_project_status ON runs(project_id, status);
-CREATE INDEX idx_runs_created_at ON runs(created_at DESC);
-
--- Event queries
-CREATE INDEX idx_log_events_run_type ON log_events(run_id, event_type);
-CREATE INDEX idx_log_events_created_at ON log_events(created_at DESC);
-
--- Artifact queries
-CREATE INDEX idx_artifacts_run_phase ON artifacts(run_id, phase_id);
-CREATE INDEX idx_artifacts_hash ON artifacts(hash);
-
--- Trust queries
-CREATE INDEX idx_trust_scores_model ON trust_scores(model_id, created_at DESC);
-
--- Routing queries
-CREATE INDEX idx_routing_decisions_run ON routing_decisions(run_id);
-```
-
 ---
 
 ## 5. Event System
 
-### Event Bus Architecture
+### Event Bus
 
-The internal event bus uses a pub/sub pattern:
+Internal pub/sub pattern. Every significant action produces an event that is:
+1. Persisted to `log_events` table
+2. Published to internal subscribers
+3. Broadcast via SSE to connected frontend clients
+4. Hash-chained for tamper detection
 
-```python
-class EventBus:
-    _subscribers: Dict[str, List[Callable]]
+### Event Categories
 
-    def subscribe(self, event_type: str, handler: Callable):
-        """Register a handler for an event type."""
-        self._subscribers.setdefault(event_type, []).append(handler)
-
-    async def publish(self, event: Event):
-        """Publish an event to all subscribers."""
-        # 1. Persist to database
-        await self._persist(event)
-
-        # 2. Add to hash chain
-        await self._chain(event)
-
-        # 3. Notify internal subscribers
-        for handler in self._subscribers.get(event.type, []):
-            await handler(event)
-
-        # 4. Broadcast via SSE
-        await self._broadcast(event)
-```
-
-### Event Types
-
-| Category | Event Types |
-|----------|-------------|
-| Runtime | `run.started`, `run.completed`, `run.failed`, `phase.started`, `phase.completed`, `phase.failed` |
-| Model | `model.selected`, `model.called`, `model.failed`, `model.timed_out` |
-| Arbitration | `arbitration.started`, `arbitration.completed`, `arbitration.escalated` |
-| Governance | `policy.evaluated`, `trust.updated`, `drift.detected`, `gate.passed`, `gate.blocked` |
-| Intervention | `intervention.pause`, `intervention.resume`, `intervention.quarantine`, `intervention.rollback`, `intervention.escalate`, `intervention.throttle`, `intervention.override`, `intervention.terminate` |
-| Memory | `memory.created`, `memory.updated`, `memory.aged`, `memory.archived`, `memory.quarantined`, `memory.restored` |
-| Evidence | `evidence.captured`, `evidence.bundle.created`, `evidence.verified`, `evidence.tampered` |
-| System | `system.startup`, `system.shutdown`, `system.health_check` |
+| Category | Events |
+|----------|--------|
+| Runtime | run.started, run.completed, run.failed, phase.started, phase.completed |
+| Model | model.selected, model.called, model.failed, model.timed_out |
+| Governance | policy.evaluated, trust.updated, drift.detected, gate.passed, gate.blocked |
+| Intervention | intervention.pause, intervention.resume, intervention.quarantine, intervention.rollback |
+| Memory | memory.created, memory.aged, memory.archived, memory.quarantined, memory.restored |
+| Evidence | evidence.captured, evidence.bundle.created, evidence.verified |
 
 ### Hash Chain
 
 Each event is hash-chained to the previous event for tamper detection:
-
-```python
-def compute_hash(event: Event, previous_hash: str) -> str:
-    data = f"{previous_hash}:{event.type}:{event.timestamp}:{json.dumps(event.payload, sort_keys=True)}"
-    return hashlib.sha256(data.encode()).hexdigest()
+```
+hash_n = SHA256(hash_{n-1} + event_type + timestamp + payload)
 ```
 
 ---
 
 ## 6. Security Architecture
 
-### Authentication Flow
+### Authentication
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Client   │────▶│  Auth    │────▶│  User    │
-│  Login    │     │  Endpoint│     │  Store   │
-└──────────┘◀────└──────────┘     └──────────┘
-   access +
-   refresh
-   token
+- JWT-based with access + refresh tokens
+- Access tokens: short-lived (15 min default)
+- Refresh tokens: long-lived (7 days default)
+- HMAC-SHA256 signing
 
-Token Claims:
-{
-  "sub": "user-uuid",
-  "roles": ["developer", "operator"],
-  "permissions": ["project:read", "project:write", ...],
-  "workspace_id": "workspace-uuid",
-  "exp": 1716120000,
-  "iat": 1716119100
-}
-```
+### Authorization
 
-### RBAC Enforcement
+- RBAC with 30+ granular permissions
+- Endpoint-level permission declarations
+- Middleware enforcement
 
-```python
-# Permission check decorator
-def require_permission(permission: str):
-    async def dependency(current_user = Depends(get_current_user)):
-        if permission not in current_user.permissions:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Missing permission: {permission}"
-            )
-        return current_user
-    return Depends(dependency)
+### Permission Domains
 
-# Usage
-@router.post("/runs/{run_id}/pause")
-async def pause_run(
-    run_id: str,
-    user = require_permission("intervention:pause")
-):
-    ...
-```
+| Domain | Permissions |
+|--------|-------------|
+| Project | project:read, project:write, project:delete, project:admin |
+| Run | run:read, run:write, run:execute, run:terminate |
+| Model | model:read, model:configure, model:route, model:arbitrate |
+| Governance | governance:read, governance:write, governance:enforce |
+| Intervention | intervention:pause, resume, quarantine, rollback, escalate, throttle, override, terminate |
+| Memory | memory:read, memory:write, memory:archive, memory:quarantine |
+| Evidence | evidence:read, evidence:export, evidence:verify |
 
-### Data Protection
+### Security Gaps (Known)
 
-- **At Rest**: AES-256 encryption for sensitive fields (API keys, secrets)
-- **In Transit**: TLS 1.3 for all connections
-- **In Memory**: No plaintext secrets in logs or error messages
-- **In DB**: Passwords hashed with bcrypt, API keys encrypted
+- No rate limiting
+- No security headers (HSTS, CSP, X-Frame-Options)
+- No CSRF protection
+- No request size limits
+- No WAF
+- No automated secrets rotation
 
 ---
 
@@ -585,59 +318,33 @@ async def pause_run(
 ### Provider Abstraction
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  CognitiveModelRouter                                    │
-│  - Receives RoutingRequest                               │
-│  - Queries CapabilityRegistry                            │
-│  - Scores candidates                                     │
-│  - Returns RoutingDecision                               │
-└────────────────────────┬────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│  BaseModelProvider (abstract)                            │
-│  + generate(): ModelResponse                             │
-│  + embeddings(): List[float]                             │
-│  + classify(): Classification                            │
-│  + evaluate(): Evaluation                                │
-│  + health(): HealthStatus                                │
-│  + cost_estimate(): CostEstimate                         │
-│  + capabilities(): CapabilityProfile                     │
-│  + context_window(): int                                 │
-│  + provider_metadata(): Metadata                         │
-├─────────────────────────────────────────────────────────┤
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐          │
-│  │ Ollama     │ │ OpenAI     │ │ Anthropic  │          │
-│  │ Provider   │ │ Provider   │ │ Provider   │          │
-│  └────────────┘ └────────────┘ └────────────┘          │
-│  ┌────────────┐ ┌────────────┐                          │
-│  │ Gemini     │ │ OpenRouter │                          │
-│  │ Provider   │ │ Provider   │                          │
-│  └────────────┘ └────────────┘                          │
-└─────────────────────────────────────────────────────────┘
+CognitiveModelRouter
+    │
+    ├── ModelRegistry (capability profiles)
+    │
+    ├── BaseProvider (abstract)
+    │   ├── OllamaProvider (local)
+    │   ├── LMStudioProvider (local)
+    │   ├── OpenAIProvider (remote)
+    │   └── AnthropicProvider (remote)
+    │
+    └── RoutingPolicy
+        ├── prefer_local
+        ├── max_cost_per_request
+        ├── min_context_length
+        ├── fallback_enabled
+        └── max_retries
 ```
 
 ### Normalized Response
 
-All providers return a normalized `ModelResponse`:
+All providers return `InferenceResult` with: provider, model, response_text, latency_ms, token_usage, estimated_cost, finish_reason, trace_id
 
-```python
-class ModelResponse:
-    provider: str           # "ollama", "openai", etc.
-    model: str              # "qwen2.5-coder", "gpt-4o", etc.
-    response_id: str        # Unique response ID
-    output: str             # Generated text
-    raw_output: dict        # Raw provider response
-    latency_ms: float       # Response latency
-    token_usage: dict       # {input: int, output: int, total: int}
-    estimated_cost: float   # Estimated cost in USD
-    confidence: float       # Confidence score (if available)
-    finish_reason: str      # "stop", "length", "error", etc.
-    error: Optional[str]    # Error message (if failed)
-    warnings: List[str]     # Warnings (if any)
-    timestamp: datetime     # Response timestamp
-    trace_id: str           # Trace correlation ID
-```
+### Known Limitations
+
+- `ModelRegistry.list_models()` returns empty when all models have `is_available=False` (filtering bug)
+- Remote providers require API keys (not tested with live keys)
+- Ollama provider requires local Ollama instance
 
 ---
 
@@ -645,93 +352,47 @@ class ModelResponse:
 
 ### Docker Compose (Development)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Docker Network: sdlc-factory                            │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ api:8000 │  │ web:3000 │  │postgres  │              │
-│  │ FastAPI  │  │ Next.js  │  │ :5432    │              │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
-│       │             │             │                      │
-│       └─────────────┼─────────────┘                      │
-│                     │                                    │
-│  ┌──────────┐  ┌───┴─────┐  ┌──────────┐              │
-│  │ redis    │  │ qdrant  │  │prometheus│              │
-│  │ :6379    │  │ :6333   │  │ :9090    │              │
-│  └──────────┘  └─────────┘  └──────────┘              │
-│                                                          │
-│  ┌──────────┐                                           │
-│  │ grafana  │                                           │
-│  │ :3001    │                                           │
-│  └──────────┘                                           │
-└─────────────────────────────────────────────────────────┘
-```
+7 services: api (8000), web (3000), postgres (5432), redis (6379), qdrant (6333), prometheus (9090), grafana (3001)
 
-### Production Deployment
+### Production Deployment (Not Validated)
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Internet                                                │
-│       │                                                  │
-│       ▼                                                  │
-│  ┌──────────┐                                           │
-│  │  Nginx   │  ← SSL termination, reverse proxy         │
-│  │  :443    │                                           │
-│  └────┬─────┘                                           │
-│       │                                                  │
-│       ├──────────────────┐                              │
-│       ▼                  ▼                              │
-│  ┌──────────┐      ┌──────────┐                        │
-│  │ web:3000 │      │ api:8000 │                        │
-│  │ Next.js  │      │ FastAPI  │                        │
-│  └──────────┘      └────┬─────┘                        │
-│                         │                               │
-│       ┌─────────────────┼─────────────────┐            │
-│       ▼                 ▼                 ▼            │
-│  ┌──────────┐      ┌──────────┐      ┌──────────┐    │
-│  │postgres  │      │ redis    │      │ qdrant   │    │
-│  │ :5432    │      │ :6379    │      │ :6333    │    │
-│  └──────────┘      └──────────┘      └──────────┘    │
-└─────────────────────────────────────────────────────────┘
+Internet → Nginx (SSL termination) → { web:3000, api:8000 }
+                                              │
+                                    ┌─────────┼─────────┐
+                                    ▼         ▼         ▼
+                                PostgreSQL  Redis    Qdrant
 ```
+
+### Production Gaps
+
+- No CI/CD pipeline
+- No container health checks
+- No automated backups
+- No TLS/SSL configuration
+- No rate limiting
+- No HA/failover
 
 ---
 
 ## 9. Performance Characteristics
 
-### Backend Performance
+### Backend
 
 | Metric | Value | Notes |
 |--------|-------|-------|
 | API response time (p50) | < 50ms | Simple queries |
 | API response time (p95) | < 200ms | Complex queries |
-| Model call latency (local) | 20-80ms | Ollama, depends on model |
-| Model call latency (remote) | 80-150ms | OpenAI/Anthropic |
 | Event processing | < 5ms | Persist + broadcast |
-| SSE broadcast | < 1ms | Per connected client |
-| Database queries (p95) | < 30ms | With proper indexing |
-| Test suite | < 10s | 127 tests |
+| Test suite | < 10s | 128 tests |
 
-### Frontend Performance
+### Frontend
 
 | Metric | Value | Notes |
 |--------|-------|-------|
 | First Contentful Paint | < 1.5s | Next.js SSR |
 | Time to Interactive | < 2.5s | With hydration |
 | SSE reconnection | < 3s | Exponential backoff |
-| Bundle size | < 200KB | Initial JS (gzipped) |
-| Lighthouse score | > 90 | Performance category |
-
-### Scalability
-
-| Dimension | Current | Scaling Strategy |
-|-----------|---------|-----------------|
-| Concurrent runs | 10 | Horizontal scaling with Redis queue |
-| Concurrent users | 50 | Stateless API, scale horizontally |
-| Model calls/min | 100 | Rate limiting per provider |
-| Database size | 10GB | Partitioning by workspace |
-| Event throughput | 1500/s | Batch inserts, async processing |
 
 ### Resource Requirements
 
@@ -741,8 +402,57 @@ class ModelResponse:
 | Web | 0.5 core | 256MB | 100MB |
 | PostgreSQL | 2 cores | 2GB | 10GB |
 | Redis | 0.5 core | 512MB | 100MB |
-| Qdrant | 1 core | 1GB | 5GB |
-| Ollama (phi3) | 2 cores | 4GB | 5GB |
-| Ollama (qwen2.5) | 4 cores | 8GB | 10GB |
 | **Total (minimal)** | **4 cores** | **4GB** | **15GB** |
 | **Total (recommended)** | **8 cores** | **16GB** | **30GB** |
+
+---
+
+## 10. Architecture Truth Notes
+
+### What Is Real
+
+These systems are **genuinely implemented and tested**:
+
+- 21 engine files with substantive implementations (100-1229 lines each)
+- 26 API endpoint modules covering all major domains
+- 30 frontend room components (28 substantive, 2 intentional thin wrappers)
+- 128/128 backend tests passing
+- Full SDLC pipeline execution validated
+- JWT + RBAC authentication and authorization
+- SSE telemetry streaming
+- Evidence capture with hash chains
+- Deterministic replay with tamper detection
+- Drift detection across 6 dimensions
+- Trust scoring with 5-component model
+- Mutation testing (plan → execute → score)
+- Memory lifecycle management (7 states)
+- Multi-model routing with capability registry
+- Operator intervention framework (8 types)
+- Explainability engine (8 explanation types)
+
+### What Is Not Real
+
+These are **planned but not implemented**:
+
+- CI/CD pipeline
+- Production HA/failover
+- Distributed replay federation
+- Multi-language mutation testing
+- LLM-based explainability narratives
+- Adaptive drift detection
+- Semantic execution memory
+- Ontology-constrained execution
+- Trust decay scoring
+- Deception detection
+- Constitutional governance
+- Evidence signing
+
+### Known Bugs
+
+- `ModelRegistry.list_models()` returns empty when all models have `is_available=False`
+- Alembic migrations use non-standard path (`src/core/migrations` not `alembic/`)
+- No async pytest support (missing `pytest-asyncio` marker config)
+
+### Honest Assessment
+
+This is a **functional governed cognitive runtime** with comprehensive test coverage and operational frontend. It is **not production-hardened** — it lacks CI/CD, HA, security hardening, and enterprise-scale validation. The architecture is sound but the operational maturity is development-grade.

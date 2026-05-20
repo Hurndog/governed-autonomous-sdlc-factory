@@ -586,6 +586,21 @@ class SemanticCoverageEngine:
 
     # ─── 6b. Mutation Test Execution ───────────────────────────────────────
 
+    def execute_mutation(self, run_id: str) -> float:
+        """Execute mutation tests and return overall mutation score (0.0 - 1.0).
+
+        This is the single-score convenience wrapper around execute_mutation_tests.
+        Returns the fraction of mutations that were killed (detected by tests).
+        """
+        # Ensure mutations are planned first
+        self.plan_mutation_tests(run_id)
+        # Execute planned mutations
+        executed = self.execute_mutation_tests(run_id)
+        if not executed:
+            return 0.0
+        killed = sum(1 for m in executed if m.killed)
+        return killed / len(executed)
+
     def execute_mutation_tests(self, run_id: str) -> List[MutationTest]:
         """Execute planned mutation tests and record results.
 
@@ -618,11 +633,11 @@ class SemanticCoverageEngine:
             TestObligation.run_id == rid
         ).all()
 
-        # Build a mapping: requirement_id → test code
+        # Build a mapping: requirement_id → proof_statement (used as test basis)
         req_test_map = {}
         for obl in obligations:
-            if obl.test_code and obl.requirement_id:
-                req_test_map[obl.requirement_id] = obl.test_code
+            if obl.proof_statement and obl.requirement_id:
+                req_test_map[obl.requirement_id] = obl.proof_statement
 
         executed = []
         for mt in planned:
