@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/Card';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { MetricCard } from '@/components/ui/MetricCard';
@@ -61,6 +61,8 @@ interface OperationsSummary {
   recent_events: OperationEvent[];
 }
 
+type ConnectionState = 'connected' | 'reconnecting' | 'disconnected' | 'error';
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function mapHealthToStatus(health: string): 'verified' | 'warning' | 'error' | 'pending' | 'partial' {
@@ -101,7 +103,13 @@ export function OperationsCenter() {
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<'live' | 'fallback' | 'error'>('fallback');
   const [lastRefresh, setLastRefresh] = useState<string>('');
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
+  const [liveEvents, setLiveEvents] = useState<OperationEvent[]>([]);
+  const [eventCount, setEventCount] = useState(0);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Fetch summary (polling fallback) ────────────────────────────────────
   const fetchSummary = useCallback(async () => {
     try {
       const token = localStorage.getItem('auth_token') || '';
@@ -109,11 +117,7 @@ export function OperationsCenter() {
         headers: { 'Authorization': `Bearer ${token}` },
         signal: AbortSignal.timeout(10000),
       });
-
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-      }
-
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
       const json: OperationsSummary = await resp.json();
       setData(json);
       setDataSource('live');
@@ -121,18 +125,81 @@ export function OperationsCenter() {
       setLastRefresh(new Date().toLocaleTimeString());
     } catch (e: any) {
       setError(e.message || 'Failed to fetch operations summary');
-      setDataSource('error');
+      if (!data) setDataSource('error');
     } finally {
       setLoading(false);
     }
+  }, [data]);
+
+  // ── SSE Connection ──────────────────────────────────────────────────────
+  const connectSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    setConnectionState('reconnecting');
+    const token = localStorage.getItem('auth_token') || '';
+
+    const es = new EventSource(`/api/v1/operations/events/stream?token=${encodeURIComponent(token)}`);
+    eventSourceRef.current = es;
+
+    es.onopen = () => {
+      setConnectionState('connected');
+    };
+
+    es.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed.event_type === 'KEEPALIVE' || parsed.event_type === 'connected') return;
+
+        const newEvent: OperationEvent = {
+          id: parsed.id,
+          timestamp: parsed.timestamp,
+          run_id: parsed.run_id,
+          event_type: parsed.event_type,
+          severity: parsed.severity,
+          source: parsed.source,
+          message: parsed.message,
+          trust_impact: parsed.trust_impact || 0,
+          requires_operator_action: parsed.requires_operator_action || false,
+        };
+
+        setLiveEvents(prev => [newEvent, ...prev].slice(0, 100));
+        setEventCount(prev => prev + 1);
+        setDataSource('live');
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    es.onerror = () => {
+      setConnectionState('disconnected');
+      es.close();
+      eventSourceRef.current = null;
+
+      // Auto-reconnect after 5s
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connectSSE();
+      }, 5000);
+    };
   }, []);
 
+  // ── Initial load + SSE connect ──────────────────────────────────────────
   useEffect(() => {
     fetchSummary();
-    const interval = setInterval(fetchSummary, 30000);
-    return () => clearInterval(interval);
-  }, [fetchSummary]);
+    connectSSE();
 
+    // Polling fallback every 30s
+    const pollInterval = setInterval(fetchSummary, 30000);
+
+    return () => {
+      clearInterval(pollInterval);
+      if (eventSourceRef.current) eventSourceRef.current.close();
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Render ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="p-6">
@@ -154,16 +221,10 @@ export function OperationsCenter() {
           <div className="text-red-400 text-sm">
             <p className="font-semibold">Connection Error</p>
             <p className="mt-1">{error}</p>
-            <p className="mt-2 text-xs text-red-500">
-              This may be because the operations endpoint is not yet deployed or the backend is unreachable.
-            </p>
+            <button onClick={fetchSummary} className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded">
+              Retry
+            </button>
           </div>
-          <button
-            onClick={fetchSummary}
-            className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
-          >
-            Retry
-          </button>
         </Card>
       </div>
     );
@@ -182,11 +243,21 @@ export function OperationsCenter() {
           subtitle={`Real-time operational state${lastRefresh ? ` — Last updated: ${lastRefresh}` : ''}`}
         />
         <div className="flex items-center gap-3">
+          {/* Connection state indicator */}
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border ${
+            connectionState === 'connected' ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' :
+            connectionState === 'reconnecting' ? 'bg-amber-400/10 text-amber-400 border-amber-400/20' :
+            'bg-red-400/10 text-red-400 border-red-400/20'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              connectionState === 'connected' ? 'bg-emerald-400' :
+              connectionState === 'reconnecting' ? 'bg-amber-400 animate-pulse' :
+              'bg-red-400'
+            }`} />
+            {connectionState}
+          </span>
           <DataSourceBadge state={dataSource === 'live' ? 'LIVE' : dataSource === 'error' ? 'ERROR' : 'PARTIAL'} />
-          <button
-            onClick={fetchSummary}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
-          >
+          <button onClick={fetchSummary} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded">
             Refresh
           </button>
         </div>
@@ -232,15 +303,11 @@ export function OperationsCenter() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-400">Critical</span>
-                <span className={`text-sm font-bold ${alerts.total_critical > 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                  {alerts.total_critical}
-                </span>
+                <span className={`text-sm font-bold ${alerts.total_critical > 0 ? 'text-red-400' : 'text-gray-500'}`}>{alerts.total_critical}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-400">Warnings</span>
-                <span className={`text-sm font-bold ${alerts.total_warnings > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                  {alerts.total_warnings}
-                </span>
+                <span className={`text-sm font-bold ${alerts.total_warnings > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>{alerts.total_warnings}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-400">Drift Events</span>
@@ -278,15 +345,27 @@ export function OperationsCenter() {
         </Card>
       )}
 
-      {/* Recent Events */}
-      {data?.recent_events && data.recent_events.length > 0 && (
-        <Card>
-          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Recent Events</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {data.recent_events.map(event => (
+      {/* Live Event Stream */}
+      <Card>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Live Event Stream</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-500">{eventCount} events received</span>
+            {connectionState === 'connected' && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                LIVE
+              </span>
+            )}
+          </div>
+        </div>
+
+        {liveEvents.length > 0 ? (
+          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+            {liveEvents.slice(0, 50).map(event => (
               <div
                 key={event.id}
-                className={`flex items-start gap-3 p-2 rounded text-xs ${
+                className={`flex items-start gap-2 p-2 rounded text-xs ${
                   event.severity === 'critical' ? 'bg-red-950/30 border-l-2 border-red-500' :
                   event.severity === 'error' ? 'bg-red-950/20 border-l-2 border-red-400' :
                   event.severity === 'warning' ? 'bg-yellow-950/20 border-l-2 border-yellow-400' :
@@ -301,24 +380,27 @@ export function OperationsCenter() {
                   <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
                     <span>{formatTimestamp(event.timestamp)}</span>
                     {event.run_id && <span>Run: {event.run_id.slice(0, 8)}...</span>}
-                    <span>Source: {event.source}</span>
+                    <span>{event.source}</span>
                     {event.requires_operator_action && (
-                      <span className="text-yellow-400 font-semibold">⚠ REQUIRES ACTION</span>
+                      <span className="text-yellow-400 font-semibold">⚠ ACTION</span>
                     )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
-
-      {data?.recent_events && data.recent_events.length === 0 && (
-        <Card>
-          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Recent Events</h3>
-          <p className="text-xs text-gray-500">No recent events. This may indicate no runtime activity or no log events recorded yet.</p>
-        </Card>
-      )}
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-xs text-gray-500">
+              {connectionState === 'connected'
+                ? 'Waiting for events...'
+                : connectionState === 'reconnecting'
+                ? 'Reconnecting to event stream...'
+                : 'Stream disconnected. Events will appear when connection is restored.'}
+            </p>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

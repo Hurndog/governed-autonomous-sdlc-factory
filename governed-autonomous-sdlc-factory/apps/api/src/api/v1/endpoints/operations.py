@@ -1,19 +1,25 @@
 """
-Operations endpoint — Pass 1: Runtime Operations Baseline.
+Operations endpoint — Pass 1+2: Runtime Operations Baseline + Real-Time Telemetry.
 
 Provides:
 - GET /api/v1/operations/summary — operational state overview
 - GET /api/v1/operations/events — recent operation events
-- POST /api/v1/operations/events — record operation event (internal)
+- GET /api/v1/operations/events/stream — SSE real-time event stream
+- publish_operation_event() — internal helper to publish events
 
 No fake data. All data comes from actual database queries.
 """
 
+import asyncio
+import json
+import uuid
+from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Dict, List, Set
 from enum import Enum
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text, func, select, case, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,37 +86,110 @@ class OperationsSummary(BaseModel):
     recent_events: list[RuntimeOperationEvent]
 
 
-class OperationsHealth(BaseModel):
-    runtime: str  # healthy, degraded, critical
-    governance: str
-    replay: str
-    memory: str
-    drift: str
-    trust: str
-    tokenomics: str
-    overall: str
+# ── SSE Event Model ─────────────────────────────────────────────────────────
+
+@dataclass
+class OperationStreamEvent:
+    """Normalized event for SSE streaming."""
+    id: str
+    timestamp: str
+    event_type: str
+    severity: str
+    source: str
+    message: str
+    run_id: Optional[str] = None
+    workspace_id: Optional[str] = None
+    project_id: Optional[str] = None
+    metadata: dict = field(default_factory=dict)
+    trust_impact: float = 0.0
+    requires_operator_action: bool = False
+
+    def to_sse(self) -> str:
+        data = json.dumps(asdict(self))
+        return f"event: {self.event_type.lower()}\ndata: {data}\n\n"
 
 
-# ── Helper: compute run status counts from actual DB ────────────────────────
+# ── In-Process Event Queue (no Kafka, no broker) ────────────────────────────
+
+class OperationEventQueue:
+    """Simple in-process event queue for SSE streaming.
+
+    Events are persisted to log_events table and broadcast to SSE subscribers.
+    """
+
+    _subscribers: Dict[str, Set[asyncio.Queue]] = {}
+    _global_subscribers: Set[asyncio.Queue] = set()
+    _lock = asyncio.Lock()
+
+    @classmethod
+    async def subscribe(cls, run_id: Optional[str] = None) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+        async with cls._lock:
+            if run_id:
+                if run_id not in cls._subscribers:
+                    cls._subscribers[run_id] = set()
+                cls._subscribers[run_id].add(queue)
+            else:
+                cls._global_subscribers.add(queue)
+        return queue
+
+    @classmethod
+    async def unsubscribe(cls, queue: asyncio.Queue, run_id: Optional[str] = None):
+        async with cls._lock:
+            if run_id and run_id in cls._subscribers:
+                cls._subscribers[run_id].discard(queue)
+                if not cls._subscribers[run_id]:
+                    del cls._subscribers[run_id]
+            cls._global_subscribers.discard(queue)
+
+    @classmethod
+    async def publish(cls, event: OperationStreamEvent, run_id: Optional[str] = None):
+        # Persist to database
+        try:
+            from src.core.database import async_session_factory
+            async with async_session_factory() as session:
+                await session.execute(text("""
+                    INSERT INTO log_events (id, run_id, severity, message, source_file, metadata, created_at)
+                    VALUES (:id, :run_id, :severity, :message, :source, :metadata, :created_at)
+                """), {
+                    "id": event.id,
+                    "run_id": event.run_id,
+                    "severity": event.severity,
+                    "message": event.message,
+                    "source": event.source,
+                    "metadata": json.dumps(event.metadata),
+                    "created_at": datetime.now(timezone.utc),
+                })
+                await session.commit()
+        except Exception as e:
+            logger.error(f"Failed to persist operation event: {e}")
+
+        # Broadcast to SSE subscribers
+        async with cls._lock:
+            for queue in cls._global_subscribers:
+                try:
+                    queue.put_nowait(event)
+                except asyncio.QueueFull:
+                    pass
+            if run_id and run_id in cls._subscribers:
+                for queue in cls._subscribers[run_id]:
+                    try:
+                        queue.put_nowait(event)
+                    except asyncio.QueueFull:
+                        pass
+
+
+# ── Database Helpers ────────────────────────────────────────────────────────
 
 async def _get_run_status_counts(db: AsyncSession) -> dict:
-    """Get actual run status counts from database."""
     try:
-        result = await db.execute(text("""
-            SELECT status, COUNT(*) as cnt
-            FROM runs
-            GROUP BY status
-        """))
+        result = await db.execute(text("SELECT status, COUNT(*) as cnt FROM runs GROUP BY status"))
         rows = result.fetchall()
         counts = {row[0]: row[1] for row in rows}
-
         return {
-            "active": counts.get("running", 0),
-            "paused": counts.get("paused", 0),
-            "failed": counts.get("failed", 0),
-            "completed": counts.get("completed", 0),
-            "pending": counts.get("pending", 0),
-            "cancelled": counts.get("cancelled", 0),
+            "active": counts.get("running", 0), "paused": counts.get("paused", 0),
+            "failed": counts.get("failed", 0), "completed": counts.get("completed", 0),
+            "pending": counts.get("pending", 0), "cancelled": counts.get("cancelled", 0),
             "total": sum(counts.values()),
         }
     except Exception as e:
@@ -119,37 +198,27 @@ async def _get_run_status_counts(db: AsyncSession) -> dict:
 
 
 async def _get_governance_alert_count(db: AsyncSession) -> int:
-    """Count governance events requiring attention."""
     try:
-        result = await db.execute(text("""
-            SELECT COUNT(*) FROM governance_memory
-            WHERE is_active = true AND escalation_level != 'none'
-        """))
+        result = await db.execute(text("SELECT COUNT(*) FROM governance_memory WHERE is_active = true AND escalation_level != 'none'"))
         return result.scalar() or 0
     except Exception:
         return 0
 
 
 async def _get_drift_event_count(db: AsyncSession) -> int:
-    """Count active drift events."""
     try:
-        result = await db.execute(text("""
-            SELECT COUNT(*) FROM semantic_memory
-            WHERE is_active = true AND drift_score > 0.3
-        """))
+        result = await db.execute(text("SELECT COUNT(*) FROM semantic_memory WHERE is_active = true AND drift_score > 0.3"))
         return result.scalar() or 0
     except Exception:
         return 0
 
 
 async def _get_replay_integrity_status(db: AsyncSession) -> dict:
-    """Check replay integrity status."""
     try:
         result = await db.execute(text("""
-            SELECT
-                COUNT(*) as total,
-                COUNT(CASE WHEN chain_hash IS NOT NULL THEN 1 END) as chained,
-                COUNT(CASE WHEN chain_hash IS NULL THEN 1 END) as unchained
+            SELECT COUNT(*) as total,
+                   COUNT(CASE WHEN chain_hash IS NOT NULL THEN 1 END) as chained,
+                   COUNT(CASE WHEN chain_hash IS NULL THEN 1 END) as unchained
             FROM evidence_bundles
         """))
         row = result.fetchone()
@@ -166,13 +235,11 @@ async def _get_replay_integrity_status(db: AsyncSession) -> dict:
 
 
 async def _get_memory_health(db: AsyncSession) -> dict:
-    """Get memory health status."""
     try:
         result = await db.execute(text("""
-            SELECT
-                COUNT(*) as total,
-                COUNT(CASE WHEN drift_score > 0.5 THEN 1 END) as poisoned,
-                COUNT(CASE WHEN is_active = true THEN 1 END) as active
+            SELECT COUNT(*) as total,
+                   COUNT(CASE WHEN drift_score > 0.5 THEN 1 END) as poisoned,
+                   COUNT(CASE WHEN is_active = true THEN 1 END) as active
             FROM semantic_memory
         """))
         row = result.fetchone()
@@ -187,12 +254,10 @@ async def _get_memory_health(db: AsyncSession) -> dict:
 
 
 async def _get_trust_summary(db: AsyncSession) -> dict:
-    """Get trust score summary."""
     try:
         result = await db.execute(text("""
-            SELECT
-                AVG(overall_semantic_coverage_score) as avg_semantic,
-                COUNT(CASE WHEN overall_semantic_coverage_score < 0.5 THEN 1 END) as low_coverage
+            SELECT AVG(overall_semantic_coverage_score) as avg_semantic,
+                   COUNT(CASE WHEN overall_semantic_coverage_score < 0.5 THEN 1 END) as low_coverage
             FROM semantic_coverage_reports
             WHERE created_at > NOW() - INTERVAL '24 hours'
         """))
@@ -207,15 +272,10 @@ async def _get_trust_summary(db: AsyncSession) -> dict:
 
 
 async def _get_tokenomics_health(db: AsyncSession) -> dict:
-    """Get tokenomics health."""
     try:
         result = await db.execute(text("""
-            SELECT
-                SUM(total_cost) as total_cost,
-                AVG(total_cost) as avg_cost,
-                MAX(total_cost) as max_cost
-            FROM runs
-            WHERE created_at > NOW() - INTERVAL '24 hours'
+            SELECT SUM(total_cost) as total_cost, AVG(total_cost) as avg_cost, MAX(total_cost) as max_cost
+            FROM runs WHERE created_at > NOW() - INTERVAL '24 hours'
         """))
         row = result.fetchone()
         if not row or row[0] is None:
@@ -228,13 +288,10 @@ async def _get_tokenomics_health(db: AsyncSession) -> dict:
 
 
 async def _get_recent_events(db: AsyncSession, limit: int = 20) -> list[RuntimeOperationEvent]:
-    """Get recent operation events from log events."""
     try:
         result = await db.execute(text("""
             SELECT id, created_at, run_id, severity, message, metadata_, source_file
-            FROM log_events
-            ORDER BY created_at DESC
-            LIMIT :limit
+            FROM log_events ORDER BY created_at DESC LIMIT :limit
         """), {"limit": limit})
         rows = result.fetchall()
         events = []
@@ -257,17 +314,39 @@ async def _get_recent_events(db: AsyncSession, limit: int = 20) -> list[RuntimeO
         return []
 
 
+async def _get_recent_events_for_stream(run_id: Optional[str], limit: int = 20) -> List[OperationStreamEvent]:
+    """Get recent events from database for initial SSE batch."""
+    try:
+        from src.core.database import async_session_factory
+        async with async_session_factory() as session:
+            query = "SELECT id, created_at, run_id, severity, message, metadata, source_file FROM log_events WHERE 1=1"
+            params: Dict = {"limit": limit}
+            if run_id:
+                query += " AND run_id = :run_id"
+                params["run_id"] = run_id
+            query += " ORDER BY created_at DESC LIMIT :limit"
+            result = await session.execute(text(query), params)
+            rows = result.fetchall()
+            events = []
+            for row in rows:
+                events.append(OperationStreamEvent(
+                    id=str(row[0]),
+                    timestamp=row[1].isoformat() if row[1] else datetime.now(timezone.utc).isoformat(),
+                    event_type="LOG_ENTRY",
+                    severity=row[3] or "info",
+                    source=row[6] or "system",
+                    message=row[4] or "",
+                    run_id=str(row[2]) if row[2] else None,
+                    metadata=row[5] if isinstance(row[5], dict) else {},
+                ))
+            return events
+    except Exception as e:
+        logger.warning(f"Failed to get recent stream events: {e}")
+        return []
+
+
 def _compute_overall_health(health: dict) -> str:
-    """Compute overall health from individual health statuses."""
-    statuses = [
-        health.get("runtime", "unknown"),
-        health.get("governance", "unknown"),
-        health.get("replay", "unknown"),
-        health.get("memory", "unknown"),
-        health.get("drift", "unknown"),
-        health.get("trust", "unknown"),
-        health.get("tokenomics", "unknown"),
-    ]
+    statuses = [health.get(k, "unknown") for k in ("runtime", "governance", "replay", "memory", "drift", "trust", "tokenomics")]
     if any(s == "critical" for s in statuses):
         return "critical"
     if any(s == "degraded" for s in statuses):
@@ -288,8 +367,6 @@ async def get_operations_summary(
 ):
     """Get operations summary — real-time operational state overview."""
     now = datetime.now(timezone.utc)
-
-    # Gather all metrics in parallel where possible
     run_counts = await _get_run_status_counts(db)
     governance_alerts = await _get_governance_alert_count(db)
     drift_events = await _get_drift_event_count(db)
@@ -299,7 +376,6 @@ async def get_operations_summary(
     tokenomics_health = await _get_tokenomics_health(db)
     recent_events = await _get_recent_events(db)
 
-    # Compute runtime health from run counts
     total_runs = run_counts["total"]
     if total_runs == 0:
         runtime_health = "no_data"
@@ -310,13 +386,7 @@ async def get_operations_summary(
     else:
         runtime_health = "healthy"
 
-    # Drift health
-    if drift_events == 0:
-        drift_health = "healthy"
-    elif drift_events < 5:
-        drift_health = "warning"
-    else:
-        drift_health = "critical"
+    drift_health = "healthy" if drift_events == 0 else "warning" if drift_events < 5 else "critical"
 
     health = {
         "runtime": runtime_health,
@@ -361,20 +431,16 @@ async def get_operation_events(
     """Get recent operation events with optional filtering."""
     try:
         query = "SELECT id, created_at, run_id, severity, message, metadata_, source_file FROM log_events WHERE 1=1"
-        params = {"limit": limit}
-
+        params: Dict = {"limit": limit}
         if severity:
             query += " AND severity = :severity"
             params["severity"] = severity
         if run_id:
             query += " AND run_id = :run_id"
             params["run_id"] = run_id
-
         query += " ORDER BY created_at DESC LIMIT :limit"
-
         result = await db.execute(text(query), params)
         rows = result.fetchall()
-
         events = []
         for row in rows:
             events.append({
@@ -386,8 +452,109 @@ async def get_operation_events(
                 "metadata": row[5] if isinstance(row[5], dict) else {},
                 "source": row[6] or "system",
             })
-
         return {"events": events, "count": len(events)}
     except Exception as e:
         logger.error(f"Failed to get events: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get events: {e}")
+
+
+# ── SSE Stream Endpoint ─────────────────────────────────────────────────────
+
+@router.get("/events/stream")
+async def stream_operation_events(
+    run_id: Optional[str] = None,
+    current_user=Depends(require_permission("operations.view")),
+):
+    """Server-Sent Events stream for real-time operation events.
+
+    Streams run events, governance alerts, drift alerts, replay integrity alerts,
+    trust degradation alerts, memory warnings, tokenomics warnings, provider failures,
+    and autonomy reductions.
+
+    If run_id is provided, only events for that run are streamed.
+    Otherwise, all events are streamed.
+    """
+    queue = await OperationEventQueue.subscribe(run_id)
+
+    async def event_generator():
+        # Send connection confirmation
+        yield OperationStreamEvent(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            event_type="CONNECTED",
+            severity="info",
+            source="operations",
+            message=f"Stream connected{' for run ' + run_id if run_id else ' (all events)'}",
+            run_id=run_id,
+        ).to_sse()
+
+        # Send recent events from database as initial batch
+        try:
+            recent = await _get_recent_events_for_stream(run_id, limit=20)
+            for evt in recent:
+                yield evt.to_sse()
+        except Exception as e:
+            logger.warning(f"Failed to send initial events: {e}")
+
+        # Stream new events
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield event.to_sse()
+                except asyncio.TimeoutError:
+                    yield OperationStreamEvent(
+                        id=str(uuid.uuid4()),
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        event_type="KEEPALIVE",
+                        severity="info",
+                        source="operations",
+                        message="keepalive",
+                    ).to_sse()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await OperationEventQueue.unsubscribe(queue, run_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ── Internal: publish operation event ───────────────────────────────────────
+
+async def publish_operation_event(
+    event_type: str,
+    message: str,
+    severity: str = "info",
+    source: str = "operations",
+    run_id: Optional[str] = None,
+    workspace_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    metadata: Optional[Dict] = None,
+    trust_impact: float = 0.0,
+    requires_operator_action: bool = False,
+):
+    """Publish an operation event to the stream and database."""
+    event = OperationStreamEvent(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        event_type=event_type,
+        severity=severity,
+        source=source,
+        message=message,
+        run_id=run_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        metadata=metadata or {},
+        trust_impact=trust_impact,
+        requires_operator_action=requires_operator_action,
+    )
+    await OperationEventQueue.publish(event, run_id)
+    return event
