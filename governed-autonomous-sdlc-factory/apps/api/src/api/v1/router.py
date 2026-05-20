@@ -7,7 +7,7 @@ from src.api.v1.endpoints import (
     logs, evidence, costs, patterns, memory,
     github as github_endpoints, deployment, settings, engines, pipeline, cognitive,
     semantic_coverage, auth, workspaces, operations, operator_intervention, memory_lifecycle,
-    explainability,
+    explainability, model_router,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -113,5 +113,10 @@ api_router.include_router(
 
 api_router.include_router(
     explainability.router, tags=["explainability"],
+    dependencies=[Depends(get_current_user)],
+)
+
+api_router.include_router(
+    model_router.router, tags=["model-router"],
     dependencies=[Depends(get_current_user)],
 )
