@@ -111,6 +111,18 @@ class BaseProvider:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
+    async def health_check(self) -> dict:
+        """Check provider health. Override in subclasses."""
+        return {
+            "status": "unverified",
+            "error": "health_check not implemented",
+            "provider": self.provider_type.value,
+        }
+
+    async def list_available_models(self) -> list[dict]:
+        """List available models. Override in subclasses."""
+        return []
+
     def _build_result(
         self,
         model: str,
@@ -302,6 +314,59 @@ class OpenAIProvider(BaseProvider):
         prompt_cost, completion_cost = pricing.get(model, (0.0025, 0.01))
         return (prompt_tokens / 1000 * prompt_cost) + (completion_tokens / 1000 * completion_cost)
 
+    async def health_check(self) -> dict:
+        """Check OpenAI API health."""
+        if not self.api_key:
+            return {
+                "status": "misconfigured",
+                "error": "No API key configured",
+                "provider": self.provider_type.value,
+            }
+        start = time.monotonic()
+        try:
+            client = await self._get_client()
+            # Use models endpoint as health check (lightweight)
+            resp = await client.get("/models", timeout=10)
+            latency = (time.monotonic() - start) * 1000
+            if resp.status_code == 200:
+                return {
+                    "status": "available",
+                    "latency_ms": round(latency, 2),
+                    "provider": self.provider_type.value,
+                }
+            return {
+                "status": "unhealthy",
+                "error": f"HTTP {resp.status_code}",
+                "latency_ms": round(latency, 2),
+                "provider": self.provider_type.value,
+            }
+        except Exception as e:
+            latency = (time.monotonic() - start) * 1000
+            return {
+                "status": "unavailable",
+                "error": str(e),
+                "latency_ms": round(latency, 2),
+                "provider": self.provider_type.value,
+            }
+
+    async def list_available_models(self) -> list[dict]:
+        """List available OpenAI models."""
+        if not self.api_key:
+            return []
+        try:
+            client = await self._get_client()
+            resp = await client.get("/models", timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("data", [])
+            return [
+                {"model_id": m.get("id", ""), "owned_by": m.get("owned_by", "")}
+                for m in models
+            ]
+        except Exception as e:
+            logger.error(f"OpenAI list_models failed: {e}")
+            return []
+
 
 class AnthropicProvider(BaseProvider):
     """Anthropic adapter — Claude 3.5 Sonnet, Claude 3 Opus, etc."""
@@ -403,3 +468,61 @@ class AnthropicProvider(BaseProvider):
         }
         prompt_cost, completion_cost = pricing.get(model, (0.003, 0.015))
         return (prompt_tokens / 1000 * prompt_cost) + (completion_tokens / 1000 * completion_cost)
+
+    async def health_check(self) -> dict:
+        """Check Anthropic API health."""
+        if not self.api_key:
+            return {
+                "status": "misconfigured",
+                "error": "No API key configured",
+                "provider": self.provider_type.value,
+            }
+        start = time.monotonic()
+        try:
+            client = await self._get_client()
+            # Use a minimal message as health check
+            payload = {
+                "model": "claude-3-haiku-20240307",
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 1,
+            }
+            resp = await client.post("/v1/messages", json=payload, timeout=10)
+            latency = (time.monotonic() - start) * 1000
+            if resp.status_code == 200:
+                return {
+                    "status": "available",
+                    "latency_ms": round(latency, 2),
+                    "provider": self.provider_type.value,
+                }
+            return {
+                "status": "unhealthy",
+                "error": f"HTTP {resp.status_code}",
+                "latency_ms": round(latency, 2),
+                "provider": self.provider_type.value,
+            }
+        except Exception as e:
+            latency = (time.monotonic() - start) * 1000
+            return {
+                "status": "unavailable",
+                "error": str(e),
+                "latency_ms": round(latency, 2),
+                "provider": self.provider_type.value,
+            }
+
+    async def list_available_models(self) -> list[dict]:
+        """List available Anthropic models."""
+        if not self.api_key:
+            return []
+        try:
+            client = await self._get_client()
+            resp = await client.get("/v1/models", timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("data", [])
+            return [
+                {"model_id": m.get("id", ""), "display_name": m.get("display_name", "")}
+                for m in models
+            ]
+        except Exception as e:
+            logger.error(f"Anthropic list_models failed: {e}")
+            return []

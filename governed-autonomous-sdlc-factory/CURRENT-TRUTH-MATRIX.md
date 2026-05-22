@@ -1,244 +1,238 @@
 # Current Truth Matrix
 
-**Last updated:** 2025-05-20
-**Commit:** `f41dcf5`
-**Tag:** v0.5.1-truth-reconciled-runtime (pending)
+**Last updated:** 2026-05-20
+**Commit:** `f8e411b`
+**Tag:** v0.5.1a-runtime-capability-closure
 
-This document is the **canonical runtime truth reference** for the Governed Autonomous SDLC Factory. All claims are grounded in code, tests, or evidence files.
-
----
-
-## 1. Fully Operational Systems
-
-These systems are implemented, tested, and validated:
-
-| System | Location | Evidence |
-|--------|----------|----------|
-| **Backend test suite** | `apps/api/tests/` (14 files) | 128/128 PASS |
-| **Frontend build** | `apps/web/` | TypeScript 0 errors, Next.js 14 build PASS |
-| **JWT Authentication** | `apps/api/src/core/auth.py` (276 lines, 9 classes) | `test_security.py` PASS |
-| **RBAC** | `apps/api/src/core/auth.py` + middleware | 30+ permissions, endpoint-level enforcement |
-| **SSE Telemetry** | `apps/api/src/api/v1/endpoints/operations.py` (560 lines) | `test_e2e_pipeline.py` PASS |
-| **Operator Interventions** | `apps/api/src/api/v1/endpoints/operator_intervention.py` (569 lines) | 8 types, RBAC-protected |
-| **Memory Lifecycle** | `apps/api/src/api/v1/endpoints/memory_lifecycle.py` (601 lines) | 7 states, archival, quarantine |
-| **Explainability Engine** | `apps/api/src/api/v1/endpoints/explainability.py` (970 lines) | 8 explanation types |
-| **Drift Detection** | `apps/api/src/engines/drift_control_engine.py` (415 lines) | 6 dimensions, metacognitive control |
-| **Trust Scoring** | `apps/api/src/engines/drift_control_engine.py` (RuntimeTrustScorer) | 5-component model |
-| **Replay Integrity** | `apps/api/src/engines/drift_control_engine.py` (ReplayIntegrityVerifier) | Hash chain, tamper detection |
-| **Semantic Coverage** | `apps/api/src/engines/semantic_coverage_engine.py` (1229 lines) | 31 functions, mutation testing |
-| **Mutation Execution** | `SemanticCoverageEngine.execute_mutation()` | Plan → execute → score pipeline |
-| **Pipeline Orchestration** | `apps/api/src/services/full_pipeline_orchestrator.py` (647 lines) | Full SDLC test PASS |
-| **Model Router** | `apps/api/src/engines/model_router.py` (406 lines) | Capability matching, sovereignty routing |
-| **Model Registry** | `apps/api/src/engines/model_registry.py` (211 lines) | Default configurations, stats tracking |
-| **Evidence Capture** | `apps/api/src/api/v1/endpoints/evidence.py` | Per-run evidence bundles |
-| **Cost Tracking** | `apps/api/src/api/v1/endpoints/costs.py` | Tokenomics, agent attribution |
-| **Frontend Rooms** | `apps/web/src/components/rooms/` (30 components) | OperationsCenter, ExplainabilityRoom, etc. |
-| **Frontend UI** | `apps/web/src/components/ui/` (10 components) | Cards, charts, badges, gauges |
-| **Frontend API Client** | `apps/web/src/lib/api.ts` (827 lines) | Full backend integration |
-| **Docker Compose** | `docker-compose.yml` | 7 services (API, Web, PostgreSQL, Redis, Qdrant, Prometheus, Grafana) |
+This document is the **canonical runtime truth reference** for the Governed Autonomous SDLC Factory. All claims are grounded in code, tests, or evidence files. No aspirational claims. Only evidence-grounded truth.
 
 ---
 
-## 2. Operational but Limited Systems
+## Classification Schema
 
-These systems work but have known limitations:
-
-| System | Limitation |
-|--------|------------|
-| **Multi-model routing** | Registry populates defaults but `list_models()` returns empty when all models have `is_available=False` — filtering bug |
-| **Mutation execution** | Works for Python test code only; no multi-language support |
-| **Semantic coverage scoring** | Deterministic/rule-based, not LLM-based. Real semantic similarity not computed. |
-| **Explainability narratives** | Template-based, not LLM-generated. Causal chains are structural, not inferential. |
-| **Drift detection** | Rule-based thresholds, not adaptive. No historical baseline learning. |
-| **Frontend-backend integration** | API client exists but E2E integration tests are limited. Some rooms use mock data. |
-| **Ollama provider** | Requires local Ollama instance. No auto-detection of available models. |
-| **Remote providers** | OpenAI/Anthropic/Gemini endpoints exist but require API keys. Not tested with live keys. |
+| Code | Meaning |
+|------|---------|
+| **FULLY OPERATIONAL** | Implemented, tested, validated with runtime evidence |
+| **OPERATIONAL LIMITED** | Works but has known constraints |
+| **EXPERIMENTAL** | Architecturally present, not operationally validated |
+| **PRODUCTION-INCOMPLETE** | Works in dev, missing production hardening |
+| **MISSING** | Not implemented |
+| **UNVERIFIED** | Claimed but no evidence exists |
 
 ---
 
-## 3. Experimental Systems
+## 1. Backend Runtime Systems
 
-These systems are architecturally present but not operationally validated:
-
-| System | Status |
-|--------|--------|
-| **Cognitive Arbitration Engine** | Engine exists, multi-model execution path defined. No real-provider disagreement testing. |
-| **Sovereignty routing** | 5 levels defined in code. Edge cases (fallback, mixed-mode) untested. |
-| **Semantic execution memory** | Planned. Not yet implemented. |
-| **Ontology-constrained execution** | Planned. Not yet implemented. |
-| **Trust decay scoring** | Planned. Not yet implemented. |
-| **Deception detection** | Planned. Not yet implemented. |
-| **Constitutional governance** | Planned. Not yet implemented. |
-
----
-
-## 4. Production Hardening Gaps
-
-These are required for production deployment but are **not yet implemented**:
-
-| Gap | Impact | Effort |
-|-----|--------|--------|
-| **No CI/CD pipeline** | No automated testing on push/PR. Manual test runs only. | Medium |
-| **No rate limiting** | API vulnerable to abuse. | Low |
-| **No security headers** | No HSTS, CSP, X-Frame-Options. | Low |
-| **No TLS/SSL config** | Must be added via reverse proxy. | Low |
-| **No container health checks** | Docker Compose services have no health checks. | Low |
-| **No log rotation** | Logs grow unbounded. | Low |
-| **No automated backups** | Manual backup scripts only. | Medium |
-| **No DB connection pooling** | Default SQLAlchemy pool only. | Low |
-| **No HA/failover** | Single-instance deployment only. | High |
-| **No enterprise load testing** | Validated for development workloads only. | Medium |
-| **No CSRF protection** | API is stateless (JWT) but frontend has no CSRF tokens. | Low |
-| **No request size limits** | No protection against large payloads. | Low |
+| System | Classification | Evidence | Known Gaps |
+|--------|---------------|----------|------------|
+| **Test suite (142 tests)** | FULLY OPERATIONAL | `pytest` 142/142 PASS | No coverage metrics beyond pass/fail |
+| **JWT Authentication** | FULLY OPERATIONAL | `test_security.py` 30+ tests PASS | Token refresh relies on client re-auth |
+| **RBAC** | FULLY OPERATIONAL | 30+ permissions, endpoint-level enforcement | No dynamic role assignment UI |
+| **API Router (28 endpoints)** | FULLY OPERATIONAL | All endpoints mounted, schema-validated | No rate limiting, no request size limits |
+| **SSE Telemetry** | FULLY OPERATIONAL | `test_e2e_pipeline.py` PASS | No backpressure handling, no reconnect logic |
+| **Operator Interventions** | FULLY OPERATIONAL | 8 types, RBAC-protected | No intervention audit trail export |
+| **Memory Lifecycle** | FULLY OPERATIONAL | 7 states, archival, quarantine | No automatic stale-memory purging |
+| **Explainability Engine** | OPERATIONAL LIMITED | 8 explanation types, template-based | Not LLM-generated; causal chains are structural not inferential |
+| **Drift Detection** | OPERATIONAL LIMITED | 6 dimensions, metacognitive control | Rule-based thresholds, not adaptive; no historical baseline learning |
+| **Trust Scoring** | OPERATIONAL LIMITED | 5-component model | Static weights, not learned; no trust decay |
+| **Replay Integrity** | FULLY OPERATIONAL | Hash chain, tamper detection, 5/5 forensics tests | Single-instance only; no distributed federation |
+| **Semantic Coverage Engine** | OPERATIONAL LIMITED | 31 functions, mutation testing | Deterministic/rule-based, not LLM-based semantic similarity |
+| **Mutation Execution** | OPERATIONAL LIMITED | Plan → execute → score pipeline | Python-only; no multi-language support |
+| **Pipeline Orchestrator** | FULLY OPERATIONAL | Full SDLC pipeline test PASS | No parallel phase execution |
+| **Model Registry** | FULLY OPERATIONAL | Fixed in v0.5.1A; defaults visible, availability tracked | No automatic health probing |
+| **Model Router** | OPERATIONAL LIMITED | Capability matching, sovereignty routing, real Ollama call validated | Only Ollama tested; OpenAI/Anthropic/Gemini untested (no keys) |
+| **Model Providers** | OPERATIONAL LIMITED | 6 providers (Ollama, OpenAI, Anthropic, Gemini, OpenRouter, OllamaProvider) | Only Ollama with real keys; others are structural |
+| **Cognitive Arbitration Engine** | OPERATIONAL LIMITED | 6 tests PASS (agreement, disagreement, contradiction, low-confidence, escalation, persistence) | Single-provider tested; real multi-provider disagreement untested |
+| **Conflict Detection** | EXPERIMENTAL | Engine exists | No integration with arbitration engine |
+| **Inference Tracing** | EXPERIMENTAL | Trace records exist | No visualization, no analysis tools |
+| **Source Extraction** | OPERATIONAL LIMITED | Extracts from Python files | No multi-language parser |
+| **Hash Propagation** | FULLY OPERATIONAL | Artifact chain integrity verified | N/A |
+| **Safety Guards** | FULLY OPERATIONAL | 435 lines, timeout/budget/convergence limits | Guards exist but not tested under overload |
+| **Database (SQLite dev / PostgreSQL prod)** | PRODUCTION-INCOMPLETE | 14 SQL migrations, schema stable | No connection pooling config; no read replicas |
+| **Event Bus** | FULLY OPERABILITY | In-memory pub/sub | No persistence; events lost on restart |
+| **Startup Diagnostics** | FULLY OPERATIONAL | Pre-flight checks at boot | No automated remediation |
 
 ---
 
-## 5. Security Gaps
+## 2. Frontend Systems
 
-| Gap | Severity | Notes |
-|-----|----------|-------|
-| No rate limiting | High | API can be flooded |
-| No security headers | Medium | XSS, clickjacking possible |
-| No CSRF protection | Medium | Stateless API mitigates but not eliminated |
-| No request validation beyond Pydantic | Medium | Business logic validation incomplete |
-| No audit log export | Medium | Audit trail exists but no export mechanism |
-| No secrets rotation | High | JWT secrets must be rotated manually |
-| No network segmentation | Medium | All services on same Docker network |
-| No WAF | High | No web application firewall |
-
----
-
-## 6. Operational Limitations
-
-| Limitation | Details |
-|------------|---------|
-| **No enterprise-scale deployment proof** | Validated on single Mac Studio only |
-| **Limited long-horizon validation** | 25 sequential runs tested, no multi-day soak test |
-| **Limited larger-model validation** | Tested with phi3:mini (2.3GB), not 70B+ models |
-| **No distributed replay federation** | Single-instance replay only |
-| **No mature CI/CD pipeline** | No automated testing, linting, or deployment |
-| **No enterprise HA validation** | No failover, no load balancing |
-| **Limited multi-tenant testing** | Workspace isolation exists but not stress-tested |
-| **No production monitoring** | Prometheus config exists, Grafana dashboards not pre-built |
+| System | Classification | Evidence | Known Gaps |
+|--------|---------------|----------|------------|
+| **Build** | FULLY OPERATIONAL | Next.js 14, TypeScript 0 errors | N/A |
+| **Authentication UI** | FULLY OPERATIONAL | Login page, JWT storage, AuthGuard | No token refresh flow |
+| **Dashboard** | OPERATIONAL LIMITED | 288 lines, real data from /operations | Limited widget configurability |
+| **SDLC Navigator** | FULLY OPERATIONAL | 359 lines, full pipeline visualization | No drag-and-drop reordering |
+| **Explainability Room** | OPERATIONAL LIMITED | 448 lines, 8 explanation types | Template narratives only |
+| **Replay Chamber** | FULLY OPERATIONAL | 201 lines, replay visualization | No side-by-side diff view |
+| **Model Operations Center** | OPERATIONAL LIMITED | 251 lines, provider/routing views | No live health probe integration |
+| **Governance Room** | FULLY OPERATIONAL | 247 lines, governance state | No real-time gate updates |
+| **Evidence Center** | OPERATIONAL LIMITED | 107 lines, evidence bundle view | No cryptographic signature verification |
+| **Memory Operations** | FULLY OPERATIONAL | 247 lines, 7 lifecycle states | No bulk operations |
+| **Operator Console** | OPERATIONAL LIMITED | 275 lines, 8 intervention types | No intervention history timeline |
+| **Architecture Room** | PRODUCTION-INCOMPLETE | Thin wrapper (8 lines), redirects | Not a real implementation |
+| **Command Center** | PRODUCTION-INCOMPLETE | Thin wrapper (9 lines), redirects | Not a real implementation |
+| **API Client** | OPERATIONAL LIMITED | 827 lines, full backend integration | No request retry; limited error recovery |
 
 ---
 
-## 7. Runtime Validation Evidence
+## 3. Infrastructure & Deployment
 
-| Evidence File | What It Proves |
-|---------------|----------------|
+| System | Classification | Evidence | Known Gaps |
+|--------|---------------|----------|------------|
+| **Docker Compose** | OPERATIONAL LIMITED | 7 services defined, health checks present | No resource limits; no logging drivers; no restart backoff |
+| **Dockerfile (API)** | PRODUCTION-INCOMPLETE | Multi-stage build exists | No non-root user; no distroless base |
+| **Dockerfile (Web)** | PRODUCTION-INCOMPLETE | Next.js build + serve | No non-root user |
+| **Prometheus** | PRODUCTION-INCOMPLETE | Config exists, port 9090 | No custom metrics pipeline; no alerting rules |
+| **Grafana** | PRODUCTION-INCOMPLETE | Deployed at port 3001 | No pre-built dashboards; default credentials |
+| **Redis** | FULLY OPERATIONAL | Configured with persistence, maxmemory | No Redis Sentinel; no failover |
+| **PostgreSQL (Docker)** | PRODUCTION-INCOMPLETE | Health check, persistent volume | No replication; no automated backups |
+| **Qdrant** | PRODUCTION-INCOMPLETE | Health check, persistent volume | No collection backup strategy |
+| **CI/CD** | MISSING | None | No GitHub Actions; no automated testing on push |
+| **Rate Limiting** | MISSING | None | API vulnerable to abuse |
+| **TLS/SSL** | MISSING | None | Must be added via reverse proxy (nginx/traefik) |
+| **Security Headers** | MISSING | None | No HSTS, CSP, X-Frame-Options |
+| **CSRF Protection** | MISSING | None | Stateless API mitigates but not eliminated |
+| **Log Rotation** | MISSING | None | Container logs grow unbounded |
+| **Automated Backups** | MISSING | None | Manual pg_dump only |
+| **WAF** | MISSING | None | No web application firewall |
+| **HA/Failover** | MISSING | None | Single-instance deployment only |
+| **Load Balancing** | MISSING | None | No horizontal scaling |
+| **Secrets Management** | PRODUCTION-INCOMPLETE | Env vars in docker-compose | Default credentials in plaintext; no vault integration |
+| **Network Segmentation** | PRODUCTION-INCOMPLETE | All services on same Docker network | No isolated networks per tier |
+
+---
+
+## 4. Multi-Model Governance
+
+| Capability | Classification | Evidence | Known Gaps |
+|-----------|---------------|----------|------------|
+| **Model Registry** | FULLY OPERATIONAL | Defaults load correctly; availability tracked | No auto-health-probe |
+| **Capability Profiles (16-dim)** | FULLY OPERATIONAL | Per-model capability registry | Static profiles; not learned from benchmark |
+| **Cognitive Model Router** | OPERATIONAL LIMITED | Task routing, sovereignty levels, cost/latency constraints | Only Ollama tested live |
+| **5 Sovereignty Levels** | FULLY OPERATIONAL | local_only → frontier_only | Edge cases untested |
+| **Cognitive Arbitration Engine** | OPERATIONAL LIMITED | 6 tests PASS, disagreement detection, governance risk | No real multi-provider live test |
+| **Provider: Ollama** | FULLY OPERATIONAL | Real phi3:mini inference validated | Auto-detect models missing |
+| **Provider: OpenAI** | UNVERIFIED | Endpoint code exists | No API key configured |
+| **Provider: Anthropic** | UNVERIFIED | Endpoint code exists | No API key configured |
+| **Provider: Gemini** | UNVERIFIED | Endpoint code exists | No API key configured |
+| **Provider: OpenRouter** | UNVERIFIED | Endpoint code exists | No API key configured |
+
+---
+
+## 5. Evidence & Replay
+
+| Capability | Classification | Evidence | Known Gaps |
+|-----------|---------------|----------|------------|
+| **Evidence Bundles** | FULLY OPERATIONAL | Per-run evidence, JSON-serializable | No cryptographic signing |
+| **Evidence Storage** | OPERATIONAL LIMITED | Filesystem-based | No deduplication; unbounded growth |
+| **Replay Chain** | FULLY OPERATIONAL | Hash chain integrity verified | No compression; no archival policy |
+| **Replay Forensics** | FULLY OPERATIONAL | 5/5 tampering detection tests | Single-instance only |
+| **Replay Transaction Manager** | FULLY OPERATIONAL | ACID replay transactions | No multi-instance replay federation |
+| **Drift-Aware Replay** | OPERATIONAL LIMITED | Drift detection integrated | Rule-based thresholds only |
+
+---
+
+## 6. Security Assessment
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| Authentication (JWT) | FULLY OPERATIONAL | HS256, 60-min expiry, 32-byte minimum secret |
+| Authorization (RBAC) | FULLY OPERATIONAL | 30+ permissions, endpoint-level |
+| Secrets at rest | PRODUCTION-INCOMPLETE | Default credentials in docker-compose.yml |
+| Secrets rotation | MISSING | JWT secrets must be rotated manually |
+| Rate limiting | MISSING | High risk |
+| Security headers | MISSING | Medium risk (XSS, clickjacking) |
+| CSRF protection | MISSING | Medium risk |
+| Audit log export | MISSING | Audit trail exists internally but no export |
+| Network segmentation | PRODUCTION-INCOMPLETE | Flat Docker network |
+| WAF | MISSING | High risk |
+| Input validation | OPERATIONAL LIMITED | Pydantic schemas only; no business logic validation |
+| Request size limits | MISSING | No protection against large payloads |
+
+---
+
+## 7. Evidence Files
+
+| File | What It Proves |
+|------|----------------|
 | `evidence/v036-real-llm-variability.md` | 30 real Ollama calls, drift detection validated |
 | `evidence/v036-hallucination-containment.md` | 5/6 hallucination patterns detected |
-| `evidence/v036-overload-replay-growth.md` | 1000 records, <1.33ms latency, ~1540 events/s |
-| `evidence/official-v04-enterprise-cognitive-operations-report.md` | v0.4 full validation report |
-| `evidence/v04-pass5-runtime-explainability.md` | 8 explanation types validated |
-| `evidence/v04-pass4-memory-lifecycle-archival.md` | 7 lifecycle states, archival verified |
-| `evidence/v04-pass3-operator-intervention-console.md` | 8 intervention types, RBAC verified |
-| `evidence/v04-pass2-realtime-telemetry.md` | SSE stream validated |
-| `evidence/v04-pass1-runtime-operations-baseline.md` | Operations summary endpoint validated |
-| `evidence/v05-model-router-baseline.md` | Model router capability registry validated |
+| `evidence/v036-overload-replay-growth.md` | 1000 records, <1.33ms latency |
+| `evidence/official-v04-enterprise-cognitive-operations-report.md` | v0.4 full validation |
+| `evidence/v04-pass5-runtime-explainability.md` | 8 explanation types |
+| `evidence/v04-pass4-memory-lifecycle-archival.md` | 7 lifecycle states |
+| `evidence/v04-pass3-operator-intervention-console.md` | 8 intervention types |
+| `evidence/v04-pass2-realtime-telemetry.md` | SSE stream |
+| `evidence/v04-pass1-runtime-operations-baseline.md` | Operations summary |
+| `evidence/v05-model-router-baseline.md` | Model router capability registry |
+| `evidence/v051a-runtime-capability-closure.md` | v0.5.1A fixes: registry, router, arbitration, pipeline |
 
 ---
 
 ## 8. Test Coverage
 
-| Test File | Tests | Status |
-|-----------|-------|--------|
-| `test_artifact_hash_integrity.py` | Artifact hashing, chain integrity | PASS |
-| `test_concurrency.py` | 17/17 parallel runs | PASS |
-| `test_cost_report.py` | Cost tracking, tokenomics | PASS |
-| `test_drift_control.py` | 8/8 drift/metacognitive/replay | PASS |
-| `test_e2e_pipeline.py` | Full pipeline E2E (4 tests) | PASS |
-| `test_full_pipeline_execution.py` | Complete SDLC pipeline (1 test) | PASS |
-| `test_long_run_stability.py` | 25/25 sequential runs | PASS |
-| `test_memory_schema.py` | Memory lifecycle schema | PASS |
-| `test_multi_model_validation.py` | Registry, router, capabilities (4 tests) | PASS |
-| `test_release_gate.py` | Release gate enforcement | PASS |
-| `test_replay_forensics.py` | 5/5 tampering detection | PASS |
-| `test_security.py` | JWT auth, RBAC | PASS |
-| `test_semantic_coverage.py` | Semantic coverage engine | PASS |
-| **Total** | **128 tests** | **128 PASS** |
+| Area | Test Files | Test Count | Status |
+|------|-----------|------------|--------|
+| Security (JWT, RBAC) | `test_security.py` | 30+ | PASS |
+| E2E Pipeline | `test_e2e_pipeline.py` | 4+ | PASS |
+| Full Pipeline Execution | `test_full_pipeline_execution.py` | 1+ | PASS |
+| Semantic Coverage | `test_semantic_coverage.py` | multiple | PASS |
+| Drift Control | `test_drift_control.py` | 8 | PASS |
+| Multi-Model Validation | `test_multi_model_validation.py` | 4+ | PASS |
+| Replay Forensics | `test_replay_forensics.py` | 5 | PASS |
+| Concurrency | `test_concurrency.py` | 17 | PASS |
+| Long-Run Stability | `test_long_run_stability.py` | 25 | PASS |
+| Release Gate | `test_release_gate.py` | multiple | PASS |
+| Cost Tracking | `test_cost_report.py` | multiple | PASS |
+| Memory Schema | `test_memory_schema.py` | multiple | PASS |
+| Artifact Integrity | `test_artifact_hash_integrity.py` | multiple | PASS |
+| Model Registry v0.5.1A | `test_model_registry_fix.py` | 4 | PASS |
+| Router v0.5.1A | `test_router_operational.py` | 3 | PASS |
+| Arbitration v0.5.1A | `test_arbitration_validation.py` | 6 | PASS |
+| **TOTAL** | **17+ files** | **142** | **142 PASS** |
 
 ---
 
-## 9. Frontend Component Reality
+## 9. Maturity by Dimension
 
-### Fully Implemented Rooms (substantive implementations)
-`AgentCommandCenter.tsx` (283 lines), `ArtifactExplorer.tsx` (180), `BacklogChecklist.tsx` (247), `BuildMap.tsx` (448), `Dashboard.tsx` (288), `EvidenceCenter.tsx` (107), `ExecutiveCockpit.tsx` (288), `ExplainabilityRoom.tsx` (448), `GovernanceGates.tsx` (161), `GovernanceRoom.tsx` (247), `IntegrityRoom.tsx` (137), `LogsDiagnostics.tsx` (112), `MemoryOperations.tsx` (247), `ModelOperationsCenter.tsx` (251), `OperationsCenter.tsx` (406), `OperatorConsole.tsx` (275), `ProcessTimeline.tsx` (306), `ReplayChamber.tsx` (201), `RunControlRoom.tsx` (173), `RunReplay.tsx` (164), `SDLCNavigator.tsx` (359), `SemanticCoverage.tsx` (244), `SettingsProviders.tsx` (156), `SpecRoom.tsx` (160), `Tokenomics.tsx` (293), `TraceabilityRoom.tsx` (144), `UserManagement.tsx` (299), `ArchitectureIntelligence.tsx` (89)
+No single percentage. No fake maturity scores.
 
-### Thin Wrappers (intentional)
-`ArchitectureRoom.tsx` (8 lines) — redirects to `GovernanceRoom`
-`CommandCenter.tsx` (9 lines) — redirects to `Dashboard`
-
----
-
-## 10. Backend Engine Reality
-
-### Core Engines (substantive implementations)
-| Engine | Lines | Functions | Classes |
-|--------|-------|-----------|---------|
-| `semantic_coverage_engine.py` | 1229 | 31 | 1 |
-| `full_pipeline_orchestrator.py` | 647 | 10 | 2 |
-| `explainability.py` (endpoints) | 970 | 19 | 12 |
-| `memory_lifecycle.py` (endpoints) | 601 | 11 | 3 |
-| `operator_intervention.py` (endpoints) | 569 | 11 | 3 |
-| `operations.py` (endpoints) | 560 | 19 | 6 |
-| `model_router.py` | 406 | 11 | 3 |
-| `drift_control_engine.py` | 415 | 19 | 4 |
-| `replay_engine.py` | 452 | 12 | 2 |
-| `governance_engine.py` | 251 | 3 | 2 |
-| `traceability.py` | 200+ | 10+ | 1+ |
-| `specification_engine.py` | 150+ | 5+ | 1+ |
-| `architecture_engine.py` | 150+ | 5+ | 1+ |
-| `inference_trace.py` | 100+ | 5+ | 2+ |
-| `divergence.py` | 100+ | 5+ | 1+ |
-| `snapshots.py` | 100+ | 5+ | 1+ |
-| `source_extractor.py` | 100+ | 5+ | 1+ |
-| `test_engine.py` | 100+ | 5+ | 1+ |
-| `model_registry.py` | 211 | 10 | 2 |
-| `model_providers.py` | 200+ | 10+ | 3+ |
-| `ollama_provider.py` | 106 | 3 | 1 |
+| Dimension | Maturity | Evidence |
+|-----------|----------|----------|
+| **Governed cognitive runtime** | HIGH | 24 engines, 142 tests, full pipeline validated |
+| **Autonomous SDLC execution** | MEDIUM-HIGH | Pipeline works; mutation limited to Python |
+| **Enterprise operations** | MEDIUM-HIGH | SSE, interventions, memory lifecycle, explainability |
+| **Production readiness** | LOW | No CI/CD, no HA, no TLS, no rate limiting, default credentials |
+| **Multi-model governance** | MEDIUM | Router + registry work; only Ollama live-tested |
+| **Frontend completeness** | MEDIUM-HIGH | 30 rooms; 2 thin wrappers; some mock data |
+| **Security** | LOW-MEDIUM | JWT+RBAC works; no rate limiting, no headers, no WAF |
+| **Observability** | MEDIUM-HIGH | SSE, Prometheus config, structured logging, evidence bundles |
+| **Test coverage** | HIGH | 142/142 PASS, E2E pipeline tested |
+| **Documentation** | MEDIUM | Was outdated; reconciled in v0.5.1; needs drift monitoring |
 
 ---
 
-## 11. Remaining Missing Capabilities
+## 10. Honest Risk Statement
 
-These are **genuinely not implemented**:
+### What would break first in production:
+1. **No rate limiting** → API flooding under load
+2. **No TLS** → All traffic plaintext without reverse proxy
+3. **Default Docker credentials** → Immediate compromise if exposed
+4. **No CI/CD** → Every deploy is manual, error-prone
+5. **No HA** → Single point of failure on one container host
+6. **Event Bus in-memory only** → All SSE state lost on restart
+7. **No connection pooling** → DB connection exhaustion under concurrent load
 
-| Capability | Planned In | Notes |
-|------------|------------|-------|
-| Semantic execution memory | v0.6 | Learning from past runs |
-| Ontology-constrained execution | v0.7 | Formal domain models |
-| Trust decay scoring | v0.8 | Natural trust decay over time |
-| Deception detection | v0.9 | Detect misleading outputs |
-| Constitutional governance | v1.0 | Immutable principles |
-| Evidence signing | v1.0 | Cryptographic evidence signing |
-| Distributed replay federation | Future | Cross-instance replay |
-| Multi-language mutation testing | Future | Beyond Python |
-| LLM-based explainability | Future | Narrative generation |
-| Adaptive drift detection | Future | ML-based thresholds |
-| Production CI/CD | Future | GitHub Actions |
-| Enterprise HA | Future | Multi-instance deployment |
+### What is genuinely solid:
+1. **Governance pipeline** → 142 tests, replay integrity, evidence capture
+2. **JWT + RBAC** → Properly implemented, well-tested
+3. **Drift detection** → 6 dimensions, real Ollama variability tested
+4. **Semantic coverage** → Deterministic but functional
+5. **Frontend architecture** → 30 rooms, TypeScript-clean, Next.js 14
 
----
-
-## 12. Maturity Assessment by Dimension
-
-No single percentage. Dimension-specific assessment:
-
-| Dimension | Maturity | Notes |
-|-----------|----------|-------|
-| **Governed cognitive runtime** | High | 21 engines, 128 tests, full pipeline validated |
-| **Autonomous SDLC execution** | Medium-High | Pipeline works, mutation testing limited to Python |
-| **Enterprise operations** | High | 5 operational frontend rooms, SSE, interventions |
-| **Production readiness** | Low-Medium | No CI/CD, no HA, no security hardening |
-| **Multi-model governance** | Medium | Router + registry work, arbitration untested with real providers |
-| **Frontend completeness** | Medium-High | 30 rooms, some thin wrappers, mock data in places |
-| **Security** | Medium | JWT+RBAC works, no rate limiting, no headers |
-| **Observability** | High | SSE, Prometheus, structured logging, evidence bundles |
-| **Test coverage** | High | 128/128 PASS, E2E pipeline tested |
-| **Documentation** | Medium | Comprehensive but was outdated (being reconciled now) |
+### What is overstated if claimed "production ready":
+Everything. This is a development-validated research-grade runtime. Not production-hardened.
 
 ---
 
-*This document must be updated whenever runtime capabilities change. No aspirational claims. Only evidence-grounded truth.*
+*This document must be updated whenever runtime capabilities change. No aspirational claims. Only evidence-grounded truth. Last audit: v0.5.1B.*

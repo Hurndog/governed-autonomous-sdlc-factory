@@ -22,7 +22,7 @@ This is not a chatbot. This is not a prompt chain. This is an **enterprise runti
 
 | Dimension | Status | Evidence |
 |-----------|--------|----------|
-| Backend tests | ✅ 128/128 PASS | Full test suite including E2E pipeline |
+| Backend tests | ✅ 142/142 PASS | Full test suite including E2E pipeline, provider health, arbitration |
 | Frontend build | ✅ PASS | TypeScript strict, 0 errors |
 | Pipeline execution | ✅ Validated | Full SDLC pipeline test passes |
 | Replay integrity | ✅ Operational | Hash-chained snapshots, tamper detection |
@@ -32,10 +32,12 @@ This is not a chatbot. This is not a prompt chain. This is an **enterprise runti
 | JWT + RBAC | ✅ Operational | 30+ permissions, 8 intervention types |
 | SSE telemetry | ✅ Operational | Real-time event streaming |
 | Memory lifecycle | ✅ Operational | 7 states, archival with evidence preservation |
-| Multi-model routing | ✅ Phase 1 | Capability registry, sovereignty routing |
+| Multi-model routing | ✅ Operational | Capability registry, sovereignty routing, real Ollama validated |
 | Operator intervention | ✅ Operational | 8 intervention types, audit trail |
 | Mutation execution | ✅ Operational | Plan → execute → score pipeline |
 | Semantic coverage | ✅ Operational | 1229-line engine, 31 functions |
+| Model health checks | ✅ Operational | All providers implement health_check + list_available_models |
+| Arbitration engine | ✅ Validated | Agreement, disagreement, contradiction, escalation tested |
 
 ---
 
@@ -258,27 +260,44 @@ See [RELEASES.md](RELEASES.md) for detailed release notes.
 - **No TLS/SSL configuration** — must be added via reverse proxy
 - **No rate limiting** — API is unprotected against abuse
 - **No security headers** — no HSTS, CSP, or X-Frame-Options
-- **No container health checks** — Docker Compose has no health checks
 - **No log rotation** — logs grow unbounded
 - **No database connection pooling** — default SQLAlchemy pool only
 - **No production deployment validation** — not tested at enterprise scale
 - **No HA/failover** — single-instance deployment only
 - **No enterprise-scale load testing** — validated for development workloads only
+- **No secrets management** — default credentials in docker-compose.yml
+- **No WAF** — no web application firewall
 
 ### What Is Experimental
-- **Multi-model arbitration** — engine exists but limited real-provider testing
+- **Multi-model arbitration** — engine validated structurally; single-provider live test only (Ollama). Multi-provider disagreement untested (no API keys).
 - **Sovereignty routing** — 5 levels defined, edge cases untested
 - **Semantic coverage scoring** — deterministic scoring, not LLM-based
 - **Mutation execution** — works for Python test code, limited language support
 - **Explainability narratives** — template-based, not LLM-generated
 - **Drift detection** — rule-based thresholds, not adaptive
+- **Ollama provider** — requires local Ollama instance. OpenAI/Anthropic/Gemini providers exist structurally but no API keys configured.
 
 ### Known Limitations
 - Frontend rooms `ArchitectureRoom.tsx` (8 lines) and `CommandCenter.tsx` (9 lines) are thin wrappers/redirects
-- `ModelRegistry.list_models()` returns empty when all models have `is_available=False` — filtering bug
 - Alembic migrations use non-standard path (`src/core/migrations` not `alembic/`)
-- No async test support in pytest (missing `pytest-asyncio` marker config)
-- Ollama provider requires local Ollama instance; remote providers require API keys
+- No async pytest marker config in `conftest.py` (works with `pytest-asyncio` installed)
+- In-memory event bus: all SSE state is lost on restart
+- Replay storage grows unbounded; no archival or TTL policy
+- Evidence bundles grow on filesystem; no compression or retention policy
+- Only Ollama provider tested with live inference; other providers unconfigured
+
+---
+
+## Replay & Storage Scaling
+
+| Scale | Est. DB Size | Risk |
+|-------|-------------|------|
+| 100 runs | ~22 MB | Negligible |
+| 1,000 runs | ~222 MB | Low |
+| 10,000 runs | ~2.2 GB | Medium — artifact content bloat |
+| 100,000 runs | ~22 GB | High — requires archival policy |
+
+Current state: **development-scale only**. No archival, no compression, no pagination. See `docs/REPLAY-MEMORY-PRESSURE-ANALYSIS.md` for full analysis.
 
 ---
 

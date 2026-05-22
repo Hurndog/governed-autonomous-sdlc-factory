@@ -5,6 +5,8 @@ Supports local models via Ollama's API.
 from __future__ import annotations
 
 import time
+from typing import Optional
+
 import httpx
 
 from src.core.logging import get_logger
@@ -102,5 +104,53 @@ class OllamaProvider(BaseProvider):
                 parts.append(f"Assistant: {content}")
         return "\n\n".join(parts) + "\n\nAssistant:"
 
+    async def health_check(self) -> dict:
+        """Check if Ollama is reachable and return status."""
+        start = time.monotonic()
+        try:
+            client = await self._get_client()
+            resp = await client.get("/api/version", timeout=10)
+            latency = (time.monotonic() - start) * 1000
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "status": "available",
+                    "version": data.get("version", "unknown"),
+                    "latency_ms": round(latency, 2),
+                    "provider": "ollama",
+                }
+            return {
+                "status": "unhealthy",
+                "error": f"HTTP {resp.status_code}",
+                "latency_ms": round(latency, 2),
+                "provider": "ollama",
+            }
+        except Exception as e:
+            latency = (time.monotonic() - start) * 1000
+            return {
+                "status": "unavailable",
+                "error": str(e),
+                "latency_ms": round(latency, 2),
+                "provider": "ollama",
+            }
 
-from typing import Optional
+    async def list_available_models(self) -> list[dict]:
+        """List models available through Ollama."""
+        try:
+            client = await self._get_client()
+            resp = await client.get("/api/tags", timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("models", [])
+            return [
+                {
+                    "model_id": m.get("name", ""),
+                    "size_bytes": m.get("size", 0),
+                    "digest": m.get("digest", ""),
+                    "modified_at": m.get("modified_at", ""),
+                }
+                for m in models
+            ]
+        except Exception as e:
+            logger.error(f"Ollama list_models failed: {e}")
+            return []
